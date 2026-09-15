@@ -5,24 +5,24 @@
 --- selection = only those lines), built via lib.nvim's composer
 --- (`:Verb sub …` + `<Tab>` completion + Markdown docgen).
 ---
---- All three verbs share one route factory (`make_routes`) since their core
---- actions are identical apart from `compact` -- JSON and XML support it,
---- YAML doesn't (see `data.format.yaml`'s doc comment: its subset has no
+--- Every format verb shares one route factory (`make_routes`) since their
+--- core actions are identical apart from `compact` -- JSON and XML support
+--- it, YAML doesn't (see `data.format.yaml`'s doc comment: its subset has no
 --- single-line flow-style form to collapse into). Two more actions are
 --- format-specific and opted into per verb: `ndjson` (JSON only) and `to`
 --- (JSON<->YAML conversion, not offered on XML -- see `data.convert`'s doc
 --- comment for why).
 ---
---- `filter` is offered on all three, unconditionally, same as `lines`/
---- `keys`/`sort`: it filters the exact same `path_flatten` output those
---- already render, so there is nothing format-specific about it -- see
---- `data.filter`.
+--- `filter` is offered on every format verb, unconditionally, same as
+--- `lines`/`keys`/`sort`: it filters the exact same `path_flatten` output
+--- those already render, so there is nothing format-specific about it --
+--- see `data.filter`.
 ---
---- `:Data` is a fourth, separate verb: the same `pretty`/`lines`/`keys`/
---- `sort`/`filter` subset, but with the format auto-detected instead of
---- named by the verb -- see `data.detect`/`data.run_auto`. `compact`/
---- `ndjson`/`to` stay off it; reaching for one of those already means
---- knowing the format.
+--- `:Data` is a separate, format-auto-detecting verb: the same `pretty`/
+--- `lines`/`keys`/`sort`/`filter` subset, but with the format auto-detected
+--- instead of named by the verb -- see `data.detect`/`data.run_auto`.
+--- `compact`/`ndjson`/`to` stay off it; reaching for one of those already
+--- means knowing the format.
 
 local composer = require("lib.nvim.bindings.usercmd.composer")
 

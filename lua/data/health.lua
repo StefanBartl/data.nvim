@@ -6,7 +6,10 @@
 --- installed `lib.nvim` has `tables.path_flatten` (`lines`/`keys`, every
 --- format), `lib.lua.yaml.encode` (`:YAML`), and `lib.lua.xml` (`:XML`) --
 --- each only present from the version data.nvim shipped alongside the
---- feature that needs it. Read-only: never mutates state.
+--- feature that needs it. Also reports, purely informationally (never an
+--- error -- both are optional), whether `color_my_ascii` (fenced-block
+--- scope) and `pickers.nvim` (`:filter`) are present. Read-only: never
+--- mutates state.
 
 local M = {}
 
