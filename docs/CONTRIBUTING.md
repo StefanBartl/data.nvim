@@ -16,15 +16,21 @@ order. `scripts/test.sh path/to_spec.lua` runs a single spec file.
 `stylua --check .` and `luacheck lua TESTS` must be clean before a PR. Both configs
 (`stylua.toml`, `.luacheckrc`) are in the repo root.
 
-## Adding a format (YAML/XML)
+## Adding a format (XML is next)
 
-1. Build the missing primitive in `lib.nvim` first (a YAML encoder, or an XML
-   decoder+encoder) — data.nvim itself should stay a thin adapter, per
+`:YAML` is a worked example of exactly this process — see the diff that added it
+for a concrete template.
+
+1. Build the missing primitive in `lib.nvim` first (for XML: a decoder + encoder,
+   neither exists yet) — data.nvim itself should stay a thin adapter, per
    [architecture.md](architecture.md).
-2. Add `lua/data/format/<name>.lua` mirroring `format/json.lua`'s shape
-   (`decode(text)`, `render(value, mode, opts)`), register it in
+2. Add `lua/data/format/<name>.lua` mirroring `format/json.lua`/`format/yaml.lua`'s
+   shape (`decode(text)`, `render(value, mode, opts)`), register it in
    `lua/data/format/init.lua`.
-3. Add the `:YAML`/`:XML` verb in `lua/data/bindings/usrcmds.lua`, mirroring
-   `:JSON`'s routes.
+3. Call `bindings/usrcmds.lua`'s `make_verb("xml", "XML", <include_compact>)` from
+   `M.setup()` — the route factory is already parameterized by format name, so a
+   third format is one line, not a duplicated route table.
 4. Extend `lua/data/health.lua` to check the new `lib.nvim` primitive the same way
-   it checks `path_flatten`.
+   it checks `path_flatten`/`yaml.encode`.
+5. Add `format_<name>_spec.lua` and a `:XML` section in `usrcmds_spec.lua`, mirroring
+   the YAML specs.

@@ -22,6 +22,10 @@ describe("data.config", function()
     ---@diagnostic disable-next-line: undefined-field
     assert.equals(".", config.get("json.sep"))
     ---@diagnostic disable-next-line: undefined-field
+    assert.equals(2, config.get("yaml.indent"))
+    ---@diagnostic disable-next-line: undefined-field
+    assert.equals(".", config.get("yaml.sep"))
+    ---@diagnostic disable-next-line: undefined-field
     assert.is_false(config.get("keymaps.preset"))
   end)
 

@@ -10,6 +10,10 @@ local DEFAULTS = {
     indent = 2,
     sep = ".",
   },
+  yaml = {
+    indent = 2,
+    sep = ".",
+  },
   keymaps = {
     preset = false,
   },

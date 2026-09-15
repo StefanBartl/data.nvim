@@ -1,13 +1,12 @@
 ---@module 'data.format'
---- Registry of supported data formats. Only "json" is implemented (Phase 0
---- of the project concept); "yaml"/"xml" need a YAML encoder and an XML
---- module in lib.nvim first (neither exists yet) and are staged for later.
+--- Registry of supported data formats.
 
 local M = {}
 
 ---@type table<string, Data.Formatter>
 M.formats = {
   json = require("data.format.json"),
+  yaml = require("data.format.yaml"),
 }
 
 --- Look up a registered formatter by name.

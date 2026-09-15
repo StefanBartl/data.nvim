@@ -35,7 +35,7 @@ function M.check()
 
   local tables_ok, tables_mod = pcall(require, "lib.lua.tables")
   if tables_ok and type(tables_mod.path_flatten) == "function" then
-    ok("lib.lua.tables.path_flatten available (:JSON lines/keys)")
+    ok("lib.lua.tables.path_flatten available (:JSON/:YAML lines/keys)")
   else
     err(
       "lib.lua.tables.path_flatten not found -- lib.nvim is outdated",
@@ -43,9 +43,17 @@ function M.check()
     )
   end
 
-  info(
-    "yaml/xml formats: not implemented yet (json only) -- lib.nvim has no YAML encoder or XML module"
-  )
+  local yaml_ok, yaml_mod = pcall(require, "lib.lua.yaml")
+  if yaml_ok and type(yaml_mod.encode) == "function" then
+    ok("lib.lua.yaml.encode available (:YAML pretty/lines/keys/sort)")
+  else
+    err(
+      "lib.lua.yaml.encode not found -- lib.nvim is outdated",
+      { "Update StefanBartl/lib.nvim to a version that ships yaml.encode" }
+    )
+  end
+
+  info("xml format: not implemented yet -- lib.nvim has no XML module (see docs/scope.md)")
 end
 
 return M

@@ -73,4 +73,75 @@ describe(":JSON", function()
     ---@diagnostic disable-next-line: undefined-field
     assert.same({ "{not json" }, lines)
   end)
+
+  it("config.json.indent is honored when no explicit indent arg is given", function()
+    -- Regression: config.<fmt>.indent/sep used to be merged and typed but
+    -- never actually read by data.run(), so a user-set json.indent had no
+    -- effect whatsoever unless spelled out on every single invocation.
+    package.loaded["data"] = nil
+    package.loaded["data.config"] = nil
+    package.loaded["data.bindings"] = nil
+    package.loaded["data.bindings.usrcmds"] = nil
+    require("data").setup({ json = { indent = 4 } })
+
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '{"a":1}' })
+    vim.cmd("JSON pretty")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "{", '    "a": 1', "}" }, lines)
+  end)
+end)
+
+describe(":YAML", function()
+  local bufnr
+
+  before_each(function()
+    for _, name in ipairs({ "data", "data.config", "data.bindings", "data.bindings.usrcmds" }) do
+      package.loaded[name] = nil
+    end
+    require("data").setup()
+
+    bufnr = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_set_current_buf(bufnr)
+  end)
+
+  after_each(function()
+    vim.api.nvim_buf_delete(bufnr, { force = true })
+  end)
+
+  it("bare :YAML pretty-prints the whole buffer, sorted keys", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "b: 2", "a: 1" })
+    vim.cmd("YAML")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "a: 1", "b: 2" }, lines)
+  end)
+
+  it("has no :YAML compact route -- unknown subcommand, buffer untouched", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "a: 1" })
+    vim.cmd("YAML compact")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same(
+      { "a: 1" },
+      lines,
+      "an unmatched route never reaches data.run, so the buffer is untouched"
+    )
+  end)
+
+  it(":YAML lines flattens nested keys onto dotted-path lines", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "user:", "  id: 1", "level: error" })
+    vim.cmd("YAML lines")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "level: error", "user.id: 1" }, lines)
+  end)
+
+  it("malformed YAML (bad indentation) leaves the buffer untouched", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "a: 1", "  b: 2" })
+    vim.cmd("YAML")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "a: 1", "  b: 2" }, lines)
+  end)
 end)

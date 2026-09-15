@@ -19,9 +19,9 @@
 [![Lua](https://img.shields.io/badge/Lua-5.1%2FLuaJIT-2C2D72?logo=lua&logoColor=white)](https://www.lua.org)
 ![Status](https://img.shields.io/badge/status-beta-orange)
 
-Format and filter structured data (JSON today; YAML/XML planned) in place, in the
-buffer or a visual selection — `:JSON pretty`, `:JSON compact`, `:JSON lines` to flatten
-nested keys onto one `path: value` per line, `:JSON keys` for just the paths.
+Format and filter structured data (JSON and YAML today; XML planned) in place, in
+the buffer or a visual selection — `pretty`, `compact` (JSON only), `lines` to
+flatten nested keys onto one `path: value` per line, `keys` for just the paths.
 
 ---
 
@@ -44,7 +44,7 @@ answers.
 
 **The Rest**
 
-- [What it does and what not](docs/scope.md) — JSON now, why YAML/XML aren't here yet.
+- [What it does and what not](docs/scope.md) — JSON and YAML now, why XML isn't here yet.
 - [Why it does it that way](docs/architecture.md)
 - [Health check](docs/health.md) — what `:checkhealth data` reports, line by line.
 - [Contributing](docs/CONTRIBUTING.md)

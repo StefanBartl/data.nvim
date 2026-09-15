@@ -4,6 +4,10 @@
 
 - Reformat JSON in the current buffer or a visual selection: `pretty`, `compact`,
   `lines` (flattened, dotted-path `key: value`), `keys`, `sort`.
+- Reformat YAML the same way, minus `compact` — see
+  [`lib.lua.yaml`](https://github.com/StefanBartl/lib.nvim/tree/main/lua/lib/lua/yaml)'s
+  own doc comment for the (intentionally minimal) subset supported: no anchors, no
+  flow style, no block scalars.
 - Leave the buffer untouched on invalid input, with a clear error notification.
 
 ## Does not (yet)
@@ -15,19 +19,16 @@ Per the project's phased concept, in order:
 2. **Filter UI.** A `pickers.refine`-backed `:JSON filter` to reduce a large object
    down to the keys that matter (`user.*`, `error.stack`, ...) is designed but not
    built.
-3. **YAML.** `:YAML` needs a YAML *encoder* in `lib.nvim` (only a decoder,
-   `lib.lua.yaml.simple_parse`, exists today) to round-trip `pretty`/`compact`/
-   `lines`.
-4. **XML.** `:XML` needs an XML module in `lib.nvim` — neither a decoder nor an
+3. **XML.** `:XML` needs an XML module in `lib.nvim` — neither a decoder nor an
    encoder exists yet.
-5. **Format conversion** (`:JSON to yaml`) and an `ndjson` line-by-line mode fall
-   out "for free" once (3) and (4) land, since all three formats share the same
-   flatten-based Lua-value pipeline.
+4. **Format conversion** (`:JSON to yaml`) and an `ndjson` line-by-line mode fall
+   out "for free" once (3) lands, since all formats share the same flatten-based
+   Lua-value pipeline.
 
-This plugin is deliberately thin: the JSON/table primitives it uses
-(`lib.nvim.json`, `lib.lua.json.encode`, `lib.lua.tables.path_flatten`) live in
-[`lib.nvim`](https://github.com/StefanBartl/lib.nvim), not here — see
-[architecture.md](architecture.md).
+This plugin is deliberately thin: the JSON/YAML/table primitives it uses
+(`lib.nvim.json`, `lib.lua.json.encode`, `lib.lua.yaml`, `lib.lua.tables.path_flatten`,
+`lib.lua.null`) live in [`lib.nvim`](https://github.com/StefanBartl/lib.nvim), not
+here — see [architecture.md](architecture.md).
 
 ## Around it
 

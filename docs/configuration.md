@@ -8,6 +8,10 @@ require("data").setup({
     indent = 2,   -- default indent width for `:JSON pretty`/`:JSON sort`
     sep = ".",    -- default path separator for `:JSON lines`/`:JSON keys`
   },
+  yaml = {
+    indent = 2,   -- default indent width for `:YAML pretty`/`:YAML sort`
+    sep = ".",    -- default path separator for `:YAML lines`/`:YAML keys`
+  },
   keymaps = {
     preset = false, -- reserved: no default keymap preset exists yet
   },
@@ -15,7 +19,7 @@ require("data").setup({
 ```
 
 `indent`/`sep` are also overridable per invocation (`:JSON pretty 4`,
-`:JSON lines --sep=/`) — the config values are only the fallback when neither is
+`:YAML lines --sep=/`) — the config values are only the fallback when neither is
 given.
 
 `keymaps.preset` is a placeholder for a future default keymap set; setting it to

@@ -33,10 +33,10 @@ local notify = {
 
 --- Format/filter the resolved scope (range, or whole buffer) of the current
 --- buffer in place.
----@param fmt string              # "json" (only one implemented so far)
+---@param fmt string              # "json"|"yaml"
 ---@param mode Data.RenderMode
 ---@param cmd Lib.UserCommand.Args # the raw nvim user-command args (range info)
----@param opts? Data.RenderOpts
+---@param opts? Data.RenderOpts    # per-invocation override; falls back to config.<fmt>.indent/sep when a field is nil
 ---@return nil
 function M.run(fmt, mode, cmd, opts)
   local formatter = formats.get(fmt)
@@ -44,6 +44,14 @@ function M.run(fmt, mode, cmd, opts)
     notify.error(("unknown format '%s'"):format(tostring(fmt)))
     return
   end
+
+  -- Per-invocation args/flags win when given (":JSON pretty 4"); otherwise
+  -- fall back to the resolved config.<fmt>.indent/sep -- previously these
+  -- config values were merged/typed but never actually read anywhere, so a
+  -- user-set json.indent silently had no effect.
+  opts = opts or {}
+  local defaults = config.get(fmt) or {}
+  opts = { indent = opts.indent or defaults.indent, sep = opts.sep or defaults.sep }
 
   local bufnr = vim.api.nvim_get_current_buf()
   if not vim.bo[bufnr].modifiable then
@@ -64,7 +72,7 @@ function M.run(fmt, mode, cmd, opts)
     return
   end
 
-  local out, rerr = formatter.render(value, mode, opts or {})
+  local out, rerr = formatter.render(value, mode, opts)
   if not out then
     notify.error(("%s render failed: %s"):format(fmt:upper(), rerr))
     return

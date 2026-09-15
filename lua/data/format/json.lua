@@ -7,20 +7,22 @@
 local json = require("lib.nvim.json")
 local json_encode = require("lib.lua.json.encode")
 local tables = require("lib.lua.tables")
+local null = require("lib.lua.null")
 
 local M = {}
 
 ---@internal
 --- Render a leaf value for `lines`/`keys` display: bare text for strings (no
 --- quotes -- this is a human-readable summary, not valid JSON), Lua's own
---- tostring for numbers/booleans, "null" for `vim.json.decode`'s NULL
---- sentinel, and a compact JSON fragment for a table leaf (an empty `{}`/
---- `[]` survives `path_flatten` as its own leaf -- see
---- `lib.lua.tables.paths`).
+--- tostring for numbers/booleans, "null" for the shared null sentinel
+--- (`lib.nvim.json.decode` normalizes `vim.json.decode`'s own `vim.NIL` into
+--- this before it ever reaches here), and a compact JSON fragment for a
+--- table leaf (an empty `{}`/`[]` survives `path_flatten` as its own leaf --
+--- see `lib.lua.tables.paths`).
 ---@param v any
 ---@return string
 local function display(v)
-  if v == vim.NIL then
+  if null.is_null(v) then
     return "null"
   end
   local t = type(v)
