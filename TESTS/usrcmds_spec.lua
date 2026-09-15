@@ -2,6 +2,9 @@
 -- format lookup -- this file must crash and name it. The nil guards LuaLS
 -- asks for below would hide the very failure this spec exists to catch.
 ---@diagnostic disable: need-check-nil
+-- Every `disable-next-line: undefined-field` below suppresses assert.* --
+-- luassert's augmentation of the global `assert` table (workspace.check-
+-- ThirdParty is off, so no busted/luassert stub is injected) -- not a real gap.
 -- TESTS/usrcmds_spec.lua — the :JSON command, end to end against a real buffer.
 
 --- Capture every `vim.notify` call made during `fn()`, pumping the event
