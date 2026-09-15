@@ -36,7 +36,15 @@ jobs:
       - run: luacheck .
 
   tests:
-    runs-on: ubuntu-latest
+    # Both OSes the plugin is actually used on: Windows isn't just "also
+    # supported" here, it's the primary author's own daily driver -- a
+    # bash-isms regression (path separators, scripts/test.sh's own shell
+    # syntax) would otherwise only ever surface after the fact, on someone's
+    # real machine, never in CI.
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
       # lib.nvim is a runtime dependency (json, tables.path_flatten, notify,
@@ -60,4 +68,8 @@ jobs:
         with:
           neovim: true
           version: stable
+      # windows-latest's default shell is pwsh, not bash -- scripts/test.sh
+      # is a bash script (Git for Windows ships one on every windows-latest
+      # runner, actions/checkout already needs it).
       - run: scripts/test.sh
+        shell: bash

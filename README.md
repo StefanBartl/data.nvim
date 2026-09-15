@@ -26,6 +26,11 @@ Format and filter structured data (JSON, YAML, XML) in place, in the buffer or a
 visual selection — `pretty`, `compact` (JSON/XML), `lines` to flatten nested keys
 onto one `path: value` per line, `keys` for just the paths.
 
+## Table of contents
+
+- [Documentation](#documentation)
+- [License](#license)
+
 ---
 
 ## Documentation
