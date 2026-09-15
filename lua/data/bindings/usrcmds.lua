@@ -17,6 +17,12 @@
 --- `keys`/`sort`: it filters the exact same `path_flatten` output those
 --- already render, so there is nothing format-specific about it -- see
 --- `data.filter`.
+---
+--- `:Data` is a fourth, separate verb: the same `pretty`/`lines`/`keys`/
+--- `sort`/`filter` subset, but with the format auto-detected instead of
+--- named by the verb -- see `data.detect`/`data.run_auto`. `compact`/
+--- `ndjson`/`to` stay off it; reaching for one of those already means
+--- knowing the format.
 
 local composer = require("lib.nvim.bindings.usercmd.composer")
 
@@ -149,12 +155,80 @@ local function make_verb(fmt, cmd_name, include_compact, include_ndjson, to_form
   })
 end
 
---- Create the `:JSON`, `:YAML`, and `:XML` verbs.
+---@internal
+--- Route table for `:Data`: the format-agnostic subset every one of
+--- `:JSON`/`:YAML`/`:XML` already supports unconditionally (`pretty`/
+--- `lines`/`keys`/`sort`/`filter`) -- `compact`/`ndjson`/`to` stay off this
+--- verb since they're already format-specific by nature, which is exactly
+--- the case a user reaching for `:Data` already knows the answer to. See
+--- `data.detect`/`data.run_auto`.
+---@return Lib.UserCmd.Composer.Route[]
+local function make_data_routes()
+  local data = require("data")
+
+  return {
+    {
+      path = { "pretty" },
+      range = true,
+      args = INDENT_ARG,
+      desc = "Pretty-print, format auto-detected (fenced block or filetype)",
+      run = function(ctx)
+        data.run_auto("pretty", ctx.raw, { indent = ctx.args.indent })
+      end,
+    },
+    {
+      path = { "lines" },
+      range = true,
+      flags = SEP_FLAG,
+      desc = "One 'path: value' per leaf, format auto-detected (--sep to override)",
+      run = function(ctx)
+        data.run_auto("lines", ctx.raw, { sep = ctx.flags.sep })
+      end,
+    },
+    {
+      path = { "keys" },
+      range = true,
+      flags = SEP_FLAG,
+      desc = "Only the (dotted) key paths, format auto-detected",
+      run = function(ctx)
+        data.run_auto("keys", ctx.raw, { sep = ctx.flags.sep })
+      end,
+    },
+    {
+      path = { "sort" },
+      range = true,
+      args = INDENT_ARG,
+      desc = "Pretty-print with object keys sorted, format auto-detected",
+      run = function(ctx)
+        data.run_auto("sort", ctx.raw, { indent = ctx.args.indent })
+      end,
+    },
+    {
+      path = { "filter" },
+      range = true,
+      flags = SEP_FLAG,
+      desc = "Interactively filter flattened path/value entries, format auto-detected (requires pickers.nvim)",
+      run = function(ctx)
+        data.run_auto("filter", ctx.raw, { sep = ctx.flags.sep })
+      end,
+    },
+  }
+end
+
+--- Create the `:JSON`, `:YAML`, `:XML`, and `:Data` verbs.
 ---@return nil
 function M.setup()
   make_verb("json", "JSON", true, true, "yaml")
   make_verb("yaml", "YAML", false, false, "json")
   make_verb("xml", "XML", true, false, nil)
+
+  composer.verb("Data", {
+    desc = "Format/filter with json/yaml/xml auto-detected from a fenced block or filetype (range-aware; no range = whole buffer)",
+    default = function(ctx)
+      require("data").run_auto("pretty", ctx.raw, {})
+    end,
+    routes = make_data_routes(),
+  })
 end
 
 return M

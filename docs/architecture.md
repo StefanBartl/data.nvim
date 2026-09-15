@@ -92,6 +92,23 @@ back as `lines`-style text. This is also why `filter` is offered on `:JSON`,
 share across all three formats, so there is nothing format-specific to opt in
 or out of.
 
+## `:Data` reuses the fenced-block lookup it's already paying for
+
+`data.detect.format` doesn't add a second fence-scanning mechanism next to
+`data.scope.resolve`'s -- it calls the exact same
+`color_my_ascii.fences.block_at` API, just without a fixed `lang` filter, so
+the block's own language tag becomes the answer instead of a yes/no match
+against one already-chosen format. `:Data pretty` therefore does two
+`block_at` lookups on a fenced-scope hit (one in `data.detect` to learn the
+format, one in `data.scope.resolve` once `data.run` is called with that
+format to learn the range) rather than one -- an accepted, deliberate
+duplication in the same spirit as `data.filter`'s double `path_flatten` call:
+both lookups are cheap, per-buffer-changedtick-cached reads
+(`color_my_ascii.fences.list_blocks`'s own doc comment), and threading the
+already-resolved block from `data.detect` into `data.scope.resolve` would
+couple two modules that otherwise don't know about each other, to save a call
+that was never the expensive part of either function.
+
 ## Compound commands via `lib.nvim`'s composer
 
 `:JSON <action>`/`:YAML <action>`/`:XML <action>` (one verb per format, several

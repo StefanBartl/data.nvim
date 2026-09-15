@@ -296,6 +296,30 @@ function M.filter(fmt, cmd, opts)
   end)
 end
 
+--- Auto-detect the format for a `:Data <action>` invocation (an enclosing
+--- fenced code block's language when the cursor sits inside one and no
+--- explicit range was given, otherwise the buffer's own filetype -- see
+--- `data.detect`) and dispatch to `run`/`filter` accordingly. `:JSON`/
+--- `:YAML`/`:XML` never need this: the verb itself already says the format.
+---@param action string # "pretty"|"lines"|"keys"|"sort"|"filter" -- the format-agnostic subset every formatter supports the same way
+---@param cmd Lib.UserCommand.Args
+---@param opts? Data.RenderOpts
+---@return nil
+function M.run_auto(action, cmd, opts)
+  local bufnr = vim.api.nvim_get_current_buf()
+  local fmt, derr = require("data.detect").format(bufnr, cmd)
+  if not fmt then
+    notify.error(derr)
+    return
+  end
+
+  if action == "filter" then
+    M.filter(fmt, cmd, opts)
+  else
+    M.run(fmt, action, cmd, opts)
+  end
+end
+
 --- Configure data.nvim and wire up its user commands.
 ---@param opts? DataConfig
 ---@return nil

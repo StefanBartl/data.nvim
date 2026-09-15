@@ -1,9 +1,9 @@
 # Commands
 
-`:JSON`, `:YAML`, `:XML`, each `[action] [args] [flags]` — range-aware: no range
-acts on the whole buffer, a visual selection or an explicit `:N,M` range acts only
-on those lines. All three are built on `lib.nvim.bindings.usercmd.composer`, so
-every action and flag below also has `<Tab>` completion.
+`:JSON`, `:YAML`, `:XML`, `:Data`, each `[action] [args] [flags]` — range-aware:
+no range acts on the whole buffer, a visual selection or an explicit `:N,M` range
+acts only on those lines. All four are built on `lib.nvim.bindings.usercmd.composer`,
+so every action and flag below also has `<Tab>` completion.
 
 | Invocation | Action |
 | --- | --- |
@@ -42,6 +42,24 @@ untouched, with a warning. `pickers.nvim` not installed is the one way any
 (`{tag, attrs, children}`), not a plain map/array like JSON/YAML — converting
 either way would mean guessing a schema (which repeated sibling tag becomes an
 array? which attribute becomes "the" value?). See [architecture.md](architecture.md).
+
+## `:Data` — format auto-detected
+
+`:Data pretty`/`lines`/`keys`/`sort`/`filter` are the same actions, minus the
+ones that are already format-specific by nature (`compact`, `ndjson`, `to`) —
+reaching for one of those already means knowing whether it's JSON, YAML or
+XML, which is exactly the choice `:Data` exists to skip. The format comes
+from, in order:
+
+1. The enclosing fenced code block's language tag, when the cursor sits
+   inside one, no explicit range was given, and `fenced_scope.enable` isn't
+   `false` — same source as [integrations.md](integrations.md)'s
+   `color_my_ascii.nvim` scope, just without a fixed language to look for.
+2. The buffer's own `'filetype'` otherwise (a compound filetype like
+   `yaml.docker-compose` is read by its first dotted component).
+
+Neither found: a clear error naming the buffer's filetype, not a guess — use
+`:JSON`/`:YAML`/`:XML` directly instead.
 
 **Scope:** an explicit range (`:5,12JSON compact`) or visual selection
 (`'<,'>YAML lines`) always wins. Without one: if the cursor sits inside a

@@ -31,6 +31,12 @@
   `error.stack`, ...), then replace the scope with the survivors. Requires
   [pickers.nvim](https://github.com/StefanBartl/pickers.nvim) — see
   [integrations.md](integrations.md); every other action works without it.
+- `:Data pretty`/`lines`/`keys`/`sort`/`filter` — the same actions as above,
+  minus the format-specific ones (`compact`/`ndjson`/`to`), with the format
+  auto-detected instead of named by the command: the enclosing fenced
+  block's language tag when the cursor is inside one, otherwise the
+  buffer's own `'filetype'`. A clear error, not a guess, when neither maps
+  to json/yaml/xml — use `:JSON`/`:YAML`/`:XML` directly in that case.
 - Leave the buffer untouched on invalid input, with a clear error notification.
 
 ## Does not (yet)

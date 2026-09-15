@@ -30,7 +30,13 @@ total no-op: `:checkhealth data` reports whether it was found, and whole-buffer
 scope is used either way. Disable the feature outright with
 `fenced_scope.enable = false` in [`setup()`](configuration.md).
 
-## pickers.nvim — `:JSON`/`:YAML`/`:XML filter`
+The same API, called without a fixed `lang` filter, is also how `:Data`
+guesses which format a fenced block is — see
+[commands.md](commands.md#data--format-auto-detected). `fenced_scope.enable
+= false` turns this signal off for `:Data` too, same as for the other three
+commands' scope.
+
+## pickers.nvim — `:JSON`/`:YAML`/`:XML`/`:Data filter`
 
 **Required for this one action, unlike every other integration on this page.**
 `filter` reduces the flattened `path`/`value` entries `lines`/`keys` already

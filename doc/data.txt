@@ -32,15 +32,16 @@ Requires Neovim 0.9+ and `lib.nvim` (hard dependency).
     })
 <
 Calling setup() merges your options over the defaults and defines the
-`:JSON`/`:YAML`/`:XML` user commands. setup() is safe to call once.
+`:JSON`/`:YAML`/`:XML`/`:Data` user commands. setup() is safe to call once.
 
 ==============================================================================
 3. COMMANDS                                                    *data-commands*
 
-                                                        *:JSON* *:YAML* *:XML*
+                                                *:JSON* *:YAML* *:XML* *:Data*
 :[range]JSON [action] [args] [flags]
 :[range]YAML [action] [args] [flags]
 :[range]XML  [action] [args] [flags]
+:[range]Data [action] [args] [flags]
 
 Range-aware: no range acts on the whole buffer, a Visual selection or an
 explicit `:N,M` range acts only on those lines.
@@ -55,6 +56,12 @@ explicit `:N,M` range acts only on those lines.
     to yaml                        :JSON only: convert the scope to YAML
     to json                        :YAML only: convert the scope to JSON
     filter [--sep=X]                interactively filter path/value entries (needs pickers.nvim)
+
+:Data offers pretty/lines/keys/sort/filter with the format auto-detected
+(fenced block under the cursor, else the buffer's 'filetype') instead of
+named by the command -- no compact/ndjson/to, since those already require
+knowing the format. A clear error, not a guess, when neither signal maps to
+json/yaml/xml.
 
 `sort` and `pretty` are currently identical output for all three formats:
 neither JSON's nor YAML's decoder preserves the source's original key order
@@ -124,7 +131,7 @@ data.nvim is a thin editor layer: JSON decode/encode
 sentinel (`lib.lua.null`), and the recursive path-flattening `lines`/`keys`
 need (`lib.lua.tables.path_flatten`) all live in
 https://github.com/StefanBartl/lib.nvim, not in this plugin. The
-`:JSON`/`:YAML`/`:XML` commands themselves are built on
+`:JSON`/`:YAML`/`:XML`/`:Data` commands themselves are built on
 `lib.nvim.bindings.usercmd.composer`.
 
 ==============================================================================
