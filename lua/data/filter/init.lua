@@ -13,28 +13,12 @@
 
 local M = {}
 
----@internal
 --- Call `fn(a, b, c)` guarded by `pcall`, collapsing an unexpected runtime
 --- error into the same `nil, err` shape `path_flatten`/`formatter.render`
---- already use for an ordinary failure. The same belt-and-suspenders
---- `data.init`'s own `safe_call` applies to every other decode/render call
---- in this plugin -- duplicated here (not required from `data.init`) so
---- `data.filter` doesn't have to pull in the whole facade module just for
---- this, mirroring how `format/json.lua`/`format/yaml.lua`/`format/xml.lua`
---- each keep their own small `display()` rather than sharing one.
----@param fn function
----@param a any
----@param b any
----@param c any
----@return any result_or_nil
----@return string|nil err
-local function safe_call(fn, a, b, c)
-  local ok, r1, r2 = pcall(fn, a, b, c)
-  if not ok then
-    return nil, tostring(r1)
-  end
-  return r1, r2
-end
+--- already use for an ordinary failure. Shared with `data.init` -- see
+--- `data.util.safe_call`'s own doc comment for why this isn't
+--- `lib.nvim.safe_api.safe_call` instead.
+local safe_call = require("data.util.safe_call")
 
 ---@internal
 --- One `pickers.refine` item per flattened leaf: `path` for path-only
@@ -104,7 +88,13 @@ function M.run(formatter, value, opts, on_done)
   end
 
   local refine_items = to_refine_items(items, rendered)
-  local h = refine.new({
+
+  -- Everything past this point calls into pickers.refine's own API
+  -- (`Handle:prompt`/`:is_active`/`:apply`), a third-party plugin this
+  -- module doesn't control -- a bug or version mismatch there must still
+  -- reach the caller through `on_done`'s `err`, not raise past an async
+  -- UI callback.
+  local ok_new, h_or_err = pcall(refine.new, {
     fields = {
       path = function(it)
         return it.path
@@ -114,27 +104,41 @@ function M.run(formatter, value, opts, on_done)
       end,
     },
   })
+  if not ok_new then
+    on_done(nil, tostring(h_or_err))
+    return
+  end
+  local h = h_or_err
 
   local function loop()
     local changed = false
-    h:prompt(function()
+    local ok_prompt, prompt_err = pcall(h.prompt, h, function()
       changed = true
     end, function()
       if changed then
         loop()
         return
       end
-      if not h:is_active() then
-        on_done(nil, nil)
+      local ok_apply, result = pcall(function()
+        if not h:is_active() then
+          return nil
+        end
+        local kept = h:apply(refine_items)
+        local out = {}
+        for i, it in ipairs(kept) do
+          out[i] = it.line
+        end
+        return out
+      end)
+      if not ok_apply then
+        on_done(nil, tostring(result))
         return
       end
-      local kept = h:apply(refine_items)
-      local out = {}
-      for i, it in ipairs(kept) do
-        out[i] = it.line
-      end
-      on_done(out, nil)
+      on_done(result, nil)
     end)
+    if not ok_prompt then
+      on_done(nil, tostring(prompt_err))
+    end
   end
 
   loop()

@@ -42,4 +42,60 @@ describe("data.config", function()
     ---@diagnostic disable-next-line: undefined-field
     assert.equals(2, config.get("json.indent"))
   end)
+
+  it("warns about an unknown top-level key instead of silently accepting it", function()
+    local calls = {}
+    local orig = vim.notify
+    vim.notify = function(msg)
+      calls[#calls + 1] = msg
+    end
+    config.setup({ jsno = { indent = 4 } })
+    vim.wait(20)
+    vim.notify = orig
+
+    local found = false
+    for _, m in ipairs(calls) do
+      if m:match("unknown config key 'jsno'") then
+        found = true
+      end
+    end
+    ---@diagnostic disable-next-line: undefined-field
+    assert.is_true(found, "expected a warning naming the unknown key")
+    -- The typo'd key still merges in as-is (deep_merge's own contract) --
+    -- this only makes the mistake visible, it doesn't block it.
+    ---@diagnostic disable-next-line: undefined-field
+    assert.equals(2, config.get("json.indent"), "the real json.indent is untouched by the typo")
+  end)
+
+  it("warns about a wrong-typed leaf value instead of silently accepting it", function()
+    local calls = {}
+    local orig = vim.notify
+    vim.notify = function(msg)
+      calls[#calls + 1] = msg
+    end
+    config.setup({ json = { indent = "four" } })
+    vim.wait(20)
+    vim.notify = orig
+
+    local found = false
+    for _, m in ipairs(calls) do
+      if m:match("'json%.indent' should be number, got string") then
+        found = true
+      end
+    end
+    ---@diagnostic disable-next-line: undefined-field
+    assert.is_true(found, "expected a warning naming the type mismatch")
+  end)
+
+  it("get() returns a deep copy, not a live reference into the stored config", function()
+    config.setup(nil)
+    ---@diagnostic disable-next-line: undefined-field
+    local fenced = config.get("fenced_scope")
+    fenced.enable = false
+    ---@diagnostic disable-next-line: undefined-field
+    assert.is_true(
+      config.get("fenced_scope").enable,
+      "mutating a get() result must not affect the stored config"
+    )
+  end)
 end)

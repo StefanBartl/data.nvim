@@ -54,6 +54,28 @@ local function opt_or_default(v, default)
 end
 
 ---@internal
+--- Resolve `opts.indent` the same way `opt_or_default` does, but also warn
+--- distinctly when a value WAS given and is invalid (not a positive
+--- number), rather than silently falling back to `default` the same way an
+--- omitted indent already does -- `format/{json,xml,yaml}.lua`'s own
+--- `render` clamps an invalid indent to 2 too, but has no notify channel of
+--- its own to tell "you typed something wrong" apart from "you typed
+--- nothing", so that distinction has to happen here, before `render` ever
+--- sees it.
+---@param v any
+---@param default integer
+---@return integer
+local function resolve_indent(v, default)
+  if v == nil or v == "" then
+    return default
+  end
+  if type(v) ~= "number" or v < 1 then
+    notify.warn(("invalid indent %s -- using %d instead"):format(vim.inspect(v), default))
+    return default
+  end
+  return v
+end
+
 --- Call `fn(a, b, c)` guarded by `pcall`, collapsing an unexpected runtime
 --- error into the same `nil, err` shape `formatter.decode`/`formatter.render`
 --- already use. Neither `lib.lua.xml`/`lib.lua.yaml`'s decoders/encoders nor
@@ -61,20 +83,10 @@ end
 --- (or had) a recursion-depth guard as its only defense against a
 --- pathologically deep document -- this is the belt to that suspenders, so a
 --- gap in one of those guards surfaces here as a clean notification instead
---- of a raw Vim error escaping past the caller's `vim.cmd()`.
----@param fn function
----@param a any
----@param b any
----@param c any
----@return any result_or_nil
----@return string|nil err
-local function safe_call(fn, a, b, c)
-  local ok, r1, r2 = pcall(fn, a, b, c)
-  if not ok then
-    return nil, tostring(r1)
-  end
-  return r1, r2
-end
+--- of a raw Vim error escaping past the caller's `vim.cmd()`. Shared with
+--- `data.filter` (see `data.util.safe_call`'s own doc comment for why this
+--- isn't `lib.nvim.safe_api.safe_call` instead).
+local safe_call = require("data.util.safe_call")
 
 ---@internal
 --- Shared prelude for `run`/`convert`: modifiable check, scope resolution,
@@ -136,12 +148,28 @@ local function run_ndjson(formatter, fmt, bufnr, s0, e0, src, opts)
 
   vim.api.nvim_buf_set_lines(bufnr, s0, e0 + 1, false, out)
   if skipped > 0 then
-    notify.warn(
-      ("%s ndjson: %d line(s) could not be decoded and were left unchanged"):format(
-        fmt:upper(),
-        skipped
+    -- A high skip ratio usually means the scope isn't actually ndjson at
+    -- all (wrong command, wrong range) rather than "a few bad lines in an
+    -- otherwise good log dump" -- the message should say so instead of
+    -- reading identically at 1-of-500 and 450-of-500.
+    local total = #src
+    if total > 0 and (skipped / total) >= 0.5 then
+      notify.warn(
+        ("%s ndjson: %d/%d line(s) (%d%%) could not be decoded -- this scope may not actually be ndjson"):format(
+          fmt:upper(),
+          skipped,
+          total,
+          math.floor((skipped / total) * 100)
+        )
       )
-    )
+    else
+      notify.warn(
+        ("%s ndjson: %d line(s) could not be decoded and were left unchanged"):format(
+          fmt:upper(),
+          skipped
+        )
+      )
+    end
   end
 end
 
@@ -166,7 +194,7 @@ function M.run(fmt, mode, cmd, opts)
   opts = opts or {}
   local defaults = config.get(fmt) or {}
   opts = {
-    indent = opt_or_default(opts.indent, defaults.indent),
+    indent = resolve_indent(opts.indent, defaults.indent),
     sep = opt_or_default(opts.sep, defaults.sep),
   }
 
@@ -219,7 +247,7 @@ function M.convert(src_fmt, dst_fmt, cmd, opts)
   opts = opts or {}
   local defaults = config.get(dst_fmt) or {}
   opts = {
-    indent = opt_or_default(opts.indent, defaults.indent),
+    indent = resolve_indent(opts.indent, defaults.indent),
     sep = opt_or_default(opts.sep, defaults.sep),
   }
 
@@ -279,7 +307,7 @@ function M.filter(fmt, cmd, opts)
   opts = opts or {}
   local defaults = config.get(fmt) or {}
   opts = {
-    indent = opt_or_default(opts.indent, defaults.indent),
+    indent = resolve_indent(opts.indent, defaults.indent),
     sep = opt_or_default(opts.sep, defaults.sep),
   }
 

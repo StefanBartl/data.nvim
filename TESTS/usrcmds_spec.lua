@@ -1,6 +1,31 @@
 ---@diagnostic disable: need-check-nil
 -- TESTS/usrcmds_spec.lua — the :JSON command, end to end against a real buffer.
 
+--- Capture every `vim.notify` call made during `fn()`, pumping the event
+--- loop briefly afterwards so a `vim.schedule`-deferred notify (every
+--- `data.init`/`data.config` warning/error is scheduled, not synchronous --
+--- see their own doc comments for why) has actually run before this
+--- returns. Restores the real `vim.notify` regardless of whether `fn()`
+--- errors.
+---@param fn fun()
+---@return {msg: string, level: integer}[]
+local function capture_notify(fn)
+  local calls = {}
+  local orig = vim.notify
+  vim.notify = function(msg, level)
+    calls[#calls + 1] = { msg = msg, level = level }
+  end
+
+  local ok, err = pcall(fn)
+  vim.wait(20)
+  vim.notify = orig
+
+  if not ok then
+    error(err, 0)
+  end
+  return calls
+end
+
 describe(":JSON", function()
   local bufnr
 
@@ -44,6 +69,25 @@ describe(":JSON", function()
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
     ---@diagnostic disable-next-line: undefined-field
     assert.same({ "{", '    "a": 1', "}" }, lines)
+  end)
+
+  it(":JSON pretty 0 warns about the invalid indent and falls back to the default", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '{"a":1}' })
+    local calls = capture_notify(function()
+      vim.cmd("JSON pretty 0")
+    end)
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "{", '  "a": 1', "}" }, lines, "falls back to the default 2-space indent")
+
+    local found = false
+    for _, c in ipairs(calls) do
+      if c.msg:match("invalid indent") then
+        found = true
+      end
+    end
+    ---@diagnostic disable-next-line: undefined-field
+    assert.is_true(found, "expected a warning naming the invalid indent")
   end)
 
   it("a visual-selection range only rewrites the selected lines", function()
@@ -145,6 +189,22 @@ describe(":JSON", function()
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
     ---@diagnostic disable-next-line: undefined-field
     assert.same({ "{", '  "a": 1', "}", "not json", "{", '  "b": 2', "}" }, lines)
+  end)
+
+  it(":JSON ndjson escalates its warning when most lines fail to decode", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "not json 1", "not json 2", '{"a":1}' })
+    local calls = capture_notify(function()
+      vim.cmd("JSON ndjson")
+    end)
+
+    local found = false
+    for _, c in ipairs(calls) do
+      if c.msg:match("may not actually be ndjson") then
+        found = true
+      end
+    end
+    ---@diagnostic disable-next-line: undefined-field
+    assert.is_true(found, "expected the escalated message at a 2/3 skip ratio")
   end)
 
   it(":JSON ndjson keeps blank lines as-is", function()
