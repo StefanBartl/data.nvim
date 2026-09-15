@@ -71,3 +71,11 @@ action in this plugin that does not work without it.
 **[`diff.nvim`](https://github.com/StefanBartl/diff.nvim)** before/after preview of
 a filter result is a natural next step now that `filter` exists, but is not built —
 `filter` replaces the scope in place today, the same way every other action does.
+
+**[`ai.nvim`](https://github.com/StefanBartl/ai.nvim)** optionally consumes this
+plugin, never the other way around: its `context.structured_data` flag (see
+[its docs](https://github.com/StefanBartl/ai.nvim/blob/main/docs/configuration.md))
+calls straight into `data.detect`/`data.scope.resolve`/`data.format` — the same
+pipeline `:Data` itself uses — to fold the flattened form of a json/yaml/xml block
+under the cursor into an AI prompt's context. Nothing to configure here; data.nvim
+has no knowledge of ai.nvim and no code changed on this side.
