@@ -9,6 +9,7 @@
 | [configuration.md](configuration.md) | What can `setup()` take, and what's the default? |
 | [commands.md](commands.md) | What does `:JSON` actually do, action by action? |
 | [BINDINGS.md](BINDINGS.md) | Full commands/keymaps/autocmds cheatsheet. |
+| [integrations.md](integrations.md) | What does this plugin do with other plugins installed (color_my_ascii)? |
 | [scope.md](scope.md) | What does this plugin do, and deliberately not do (yet)? |
 | [architecture.md](architecture.md) | Why is the code split the way it is? |
 | [health.md](health.md) | What does `:checkhealth data` check, and what does each line mean? |

@@ -18,6 +18,9 @@ local DEFAULTS = {
     indent = 2,
     sep = ".",
   },
+  fenced_scope = {
+    enable = true,
+  },
   keymaps = {
     preset = false,
   },

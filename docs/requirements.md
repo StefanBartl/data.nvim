@@ -10,6 +10,9 @@
   `:checkhealth data` reports any of them missing explicitly rather than failing
   silently).
 
-No external CLI tools, no other plugins required. `pickers.nvim` is an optional
-future integration for the planned filter UI ([scope.md](scope.md)), not a
-dependency today.
+No external CLI tools, no other plugins required.
+[`color_my_ascii.nvim`](https://github.com/StefanBartl/color_my_ascii.nvim) is an
+optional soft dependency for fenced-block scope
+([integrations.md](integrations.md)) — its absence is a silent, total no-op.
+`pickers.nvim` is an optional future integration for the planned filter UI
+([scope.md](scope.md)), not a dependency today.

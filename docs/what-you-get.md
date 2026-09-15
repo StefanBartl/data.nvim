@@ -14,3 +14,9 @@ Calling `require("data").setup()` with no arguments (or `opts = {}` under lazy.n
   or via [configuration.md](configuration.md)'s `json.indent`/`yaml.indent`/`xml.indent`.
 - `lines`/`keys` default to `.` as the path separator; override per-invocation
   (`:YAML lines --sep=/`) or via `json.sep`/`yaml.sep`/`xml.sep`.
+- `:JSON` also gets `ndjson` (pretty-print one-object-per-line logs) and
+  `to yaml` (`:YAML` gets `to json`) — see [commands.md](commands.md).
+- With no range given, a cursor inside a matching fenced code block scopes to
+  that block instead of the whole buffer, if
+  [color_my_ascii.nvim](https://github.com/StefanBartl/color_my_ascii.nvim) is
+  installed — see [integrations.md](integrations.md). A total no-op without it.

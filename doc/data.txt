@@ -11,6 +11,7 @@ CONTENTS                                                        *data-contents*
   5. Scope ..................................... |data-scope|
   6. Health .................................... |data-health|
   7. lib.nvim integration ...................... |data-lib|
+  8. Integrations .............................. |data-integrations|
 
 ==============================================================================
 1. INTRODUCTION                                             *data-introduction*
@@ -50,6 +51,9 @@ explicit `:N,M` range acts only on those lines.
     lines [--sep=X]                one "path: value" per leaf, dotted keys
     keys [--sep=X]                 only the (dotted) key paths, no values
     sort [indent]                  pretty-print with sorted object keys
+    ndjson [indent]                :JSON only: pretty-print each line as its own object
+    to yaml                        :JSON only: convert the scope to YAML
+    to json                        :YAML only: convert the scope to JSON
 
 `sort` and `pretty` are currently identical output for all three formats:
 neither JSON's nor YAML's decoder preserves the source's original key order
@@ -79,6 +83,9 @@ Full cheatsheet (including `<Tab>` completion behavior): docs/BINDINGS.md.
         indent = 2,   -- default indent for :XML pretty/sort
         sep = ".",    -- default path separator for :XML lines/keys
       },
+      fenced_scope = {
+        enable = true, -- see |data-integrations|
+      },
       keymaps = {
         preset = false, -- reserved; no default keymap preset exists yet
       },
@@ -90,9 +97,11 @@ Full cheatsheet (including `<Tab>` completion behavior): docs/BINDINGS.md.
 ==============================================================================
 5. SCOPE                                                            *data-scope*
 
-  - No range -> the whole current buffer.
   - A range (`:5,12JSON compact`) or a Visual selection (`'<,'>JSON lines`)
-    -> only those lines are decoded and replaced.
+    always wins -> only those lines are decoded and replaced.
+  - Otherwise, with the cursor inside a matching fenced code block and
+    color_my_ascii.nvim installed -> that block's interior (|data-integrations|).
+  - Otherwise -> the whole current buffer.
   - Register scope (`--reg=`, output to a scratch split instead of the
     buffer) and a `pickers.refine`-based `:JSON filter` are designed but not
     implemented yet -- see docs/scope.md in the repository.
@@ -116,5 +125,14 @@ need (`lib.lua.tables.path_flatten`) all live in
 https://github.com/StefanBartl/lib.nvim, not in this plugin. The
 `:JSON`/`:YAML`/`:XML` commands themselves are built on
 `lib.nvim.bindings.usercmd.composer`.
+
+==============================================================================
+8. INTEGRATIONS                                               *data-integrations*
+
+color_my_ascii.nvim (optional): when installed and the cursor sits inside a
+fenced code block tagged ```json/```yaml/```xml with no explicit range given,
+that block's interior becomes the scope instead of the whole buffer. A total
+no-op without it. Disable with `fenced_scope.enable = false`. See
+docs/integrations.md.
 
  vim:tw=78:ts=8:ft=help:norl:

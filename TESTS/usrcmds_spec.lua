@@ -90,6 +90,38 @@ describe(":JSON", function()
     ---@diagnostic disable-next-line: undefined-field
     assert.same({ "{", '    "a": 1', "}" }, lines)
   end)
+
+  it(":JSON ndjson pretty-prints each line as its own object", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '{"a":1}', '{"b":2}' })
+    vim.cmd("JSON ndjson")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "{", '  "a": 1', "}", "{", '  "b": 2', "}" }, lines)
+  end)
+
+  it(":JSON ndjson leaves a line that fails to decode unchanged and warns once", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '{"a":1}', "not json", '{"b":2}' })
+    vim.cmd("JSON ndjson")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "{", '  "a": 1', "}", "not json", "{", '  "b": 2', "}" }, lines)
+  end)
+
+  it(":JSON ndjson keeps blank lines as-is", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '{"a":1}', "", '{"b":2}' })
+    vim.cmd("JSON ndjson")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "{", '  "a": 1', "}", "", "{", '  "b": 2', "}" }, lines)
+  end)
+
+  it(":JSON to yaml converts the scope to YAML", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '{"user":{"id":1},"level":"error"}' })
+    vim.cmd("JSON to yaml")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "level: error", "user:", "  id: 1" }, lines)
+  end)
 end)
 
 describe(":YAML", function()
@@ -143,6 +175,14 @@ describe(":YAML", function()
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
     ---@diagnostic disable-next-line: undefined-field
     assert.same({ "a: 1", "  b: 2" }, lines)
+  end)
+
+  it(":YAML to json converts the scope to JSON", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "level: error", "user:", "  id: 1" })
+    vim.cmd("YAML to json")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "{", '  "level": "error",', '  "user": {', '    "id": 1', "  }", "}" }, lines)
   end)
 end)
 

@@ -11,6 +11,11 @@ LIB_NVIM_DIR=/path/to/lib.nvim scripts/test.sh
 `.deps/plenary.nvim`, or `../plenary.nvim`) — see that file for the exact search
 order. `scripts/test.sh path/to_spec.lua` runs a single spec file.
 
+`COLOR_MY_ASCII_DIR` (or a sibling `../color_my_ascii.nvim`/`.deps/color_my_ascii.nvim`)
+is looked up the same way but is optional: the fenced-scope specs in
+`scope_resolve_spec.lua` skip themselves when it isn't found, rather than failing
+the run — see [integrations.md](integrations.md).
+
 ## Style
 
 `stylua --check .` and `luacheck lua TESTS` must be clean before a PR. Both configs

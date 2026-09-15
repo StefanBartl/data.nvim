@@ -67,6 +67,16 @@ function M.check()
   info(
     "yaml/xml are deliberately minimal subsets (no anchors/flow-style/DTDs/namespaces) -- see docs/scope.md"
   )
+
+  if pcall(require, "color_my_ascii") then
+    ok(
+      "color_my_ascii detected -- :JSON/:YAML/:XML scope to an enclosing fenced block when no range is given"
+    )
+  else
+    info(
+      "color_my_ascii not found (optional) -- fenced-block scope is unavailable, whole-buffer scope is used instead"
+    )
+  end
 end
 
 return M

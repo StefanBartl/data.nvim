@@ -1,6 +1,6 @@
 ---@module 'data'
---- Public facade for data.nvim: `setup()` plus the range-aware `run()` action
---- every `:JSON`/`:YAML`/`:XML` route calls into.
+--- Public facade for data.nvim: `setup()` plus the range-aware `run()`/
+--- `convert()` actions every `:JSON`/`:YAML`/`:XML` route calls into.
 
 local config = require("data.config")
 local formats = require("data.format")
@@ -15,9 +15,9 @@ local M = {}
 --- script, a macro, a test), that surfaces as a raw "Vim:..." error from the
 --- *caller's* `vim.cmd()` instead of a clean notification -- the exact
 --- failure mode lib.nvim's own composer defers past with `vim.schedule` (see
---- `lib.nvim.bindings.usercmd.composer`'s `make_deferred_notify`). `M.run` is
---- reached the same way (a route handler calling straight through), so it
---- needs the same deferral.
+--- `lib.nvim.bindings.usercmd.composer`'s `make_deferred_notify`). `M.run`/
+--- `M.convert` are reached the same way (a route handler calling straight
+--- through), so they need the same deferral.
 local notify = {
   error = function(msg)
     vim.schedule(function()
@@ -31,9 +31,78 @@ local notify = {
   end,
 }
 
---- Format/filter the resolved scope (range, or whole buffer) of the current
---- buffer in place.
----@param fmt string              # "json"|"yaml"
+---@internal
+--- Shared prelude for `run`/`convert`: modifiable check, scope resolution,
+--- non-empty check. Already notifies on failure, so callers only need to
+--- check for a nil `s0`.
+---@param bufnr integer
+---@param cmd Lib.UserCommand.Args
+---@param fmt string
+---@return integer|nil s0, integer|nil e0, string[]|nil src
+local function resolve_scope(bufnr, cmd, fmt)
+  if not vim.bo[bufnr].modifiable then
+    notify.error("buffer is not modifiable")
+    return nil, nil, nil
+  end
+  local s0, e0 = scope.lines(bufnr, cmd, fmt)
+  local src = vim.api.nvim_buf_get_lines(bufnr, s0, e0 + 1, false)
+  if #src == 0 then
+    notify.warn("nothing to process (empty range)")
+    return nil, nil, nil
+  end
+  return s0, e0, src
+end
+
+---@internal
+--- `:JSON ndjson`: treat each non-blank line of the scope as its own JSON
+--- object (rather than the whole scope as one document) and pretty-print it
+--- in place. A line that fails to decode is left completely unchanged --
+--- one bad line in a log dump shouldn't block reformatting the rest -- and
+--- the total skipped is reported once as a single warning afterwards.
+---@param formatter Data.Formatter
+---@param fmt string
+---@param bufnr integer
+---@param s0 integer
+---@param e0 integer
+---@param src string[]
+---@param opts Data.RenderOpts
+---@return nil
+local function run_ndjson(formatter, fmt, bufnr, s0, e0, src, opts)
+  local out, skipped = {}, 0
+  for _, line in ipairs(src) do
+    if line:find("%S") then
+      local value, derr = formatter.decode(line)
+      local rendered, rerr
+      if not derr then
+        rendered, rerr = formatter.render(value, "pretty", opts)
+      end
+      if rendered and not rerr then
+        for _, rl in ipairs(rendered) do
+          out[#out + 1] = rl
+        end
+      else
+        skipped = skipped + 1
+        out[#out + 1] = line
+      end
+    else
+      out[#out + 1] = line
+    end
+  end
+
+  vim.api.nvim_buf_set_lines(bufnr, s0, e0 + 1, false, out)
+  if skipped > 0 then
+    notify.warn(
+      ("%s ndjson: %d line(s) could not be decoded and were left unchanged"):format(
+        fmt:upper(),
+        skipped
+      )
+    )
+  end
+end
+
+--- Format/filter the resolved scope (range, fenced block, or whole buffer)
+--- of the current buffer in place.
+---@param fmt string              # "json"|"yaml"|"xml"
 ---@param mode Data.RenderMode
 ---@param cmd Lib.UserCommand.Args # the raw nvim user-command args (range info)
 ---@param opts? Data.RenderOpts    # per-invocation override; falls back to config.<fmt>.indent/sep when a field is nil
@@ -54,15 +123,15 @@ function M.run(fmt, mode, cmd, opts)
   opts = { indent = opts.indent or defaults.indent, sep = opts.sep or defaults.sep }
 
   local bufnr = vim.api.nvim_get_current_buf()
-  if not vim.bo[bufnr].modifiable then
-    notify.error("buffer is not modifiable")
+  local s0, e0, src = resolve_scope(bufnr, cmd, fmt)
+  if not s0 then
     return
   end
+  ---@cast e0 integer
+  ---@cast src string[]
 
-  local s0, e0 = scope.lines(bufnr, cmd)
-  local src = vim.api.nvim_buf_get_lines(bufnr, s0, e0 + 1, false)
-  if #src == 0 then
-    notify.warn("nothing to format (empty range)")
+  if mode == "ndjson" then
+    run_ndjson(formatter, fmt, bufnr, s0, e0, src, opts)
     return
   end
 
@@ -75,6 +144,51 @@ function M.run(fmt, mode, cmd, opts)
   local out, rerr = formatter.render(value, mode, opts)
   if not out then
     notify.error(("%s render failed: %s"):format(fmt:upper(), rerr))
+    return
+  end
+
+  vim.api.nvim_buf_set_lines(bufnr, s0, e0 + 1, false, out)
+end
+
+--- Convert the resolved scope from `src_fmt` to `dst_fmt`, replacing it with
+--- the pretty-printed result in the target format (`:JSON to yaml`,
+--- `:YAML to json`). XML is deliberately not wired into this: its decoded
+--- element tree has no unambiguous mapping to or from a plain JSON/YAML
+--- value without a schema -- see docs/architecture.md.
+---@param src_fmt string
+---@param dst_fmt string
+---@param cmd Lib.UserCommand.Args
+---@param opts? Data.RenderOpts
+---@return nil
+function M.convert(src_fmt, dst_fmt, cmd, opts)
+  local src_formatter = formats.get(src_fmt)
+  local dst_formatter = formats.get(dst_fmt)
+  if not (src_formatter and dst_formatter) then
+    notify.error(("unknown format '%s'"):format(tostring(not src_formatter and src_fmt or dst_fmt)))
+    return
+  end
+
+  opts = opts or {}
+  local defaults = config.get(dst_fmt) or {}
+  opts = { indent = opts.indent or defaults.indent, sep = opts.sep or defaults.sep }
+
+  local bufnr = vim.api.nvim_get_current_buf()
+  local s0, e0, src = resolve_scope(bufnr, cmd, src_fmt)
+  if not s0 then
+    return
+  end
+  ---@cast e0 integer
+  ---@cast src string[]
+
+  local value, derr = src_formatter.decode(table.concat(src, "\n"))
+  if derr then
+    notify.error(("%s decode failed: %s"):format(src_fmt:upper(), derr))
+    return
+  end
+
+  local out, rerr = dst_formatter.render(value, "pretty", opts)
+  if not out then
+    notify.error(("%s -> %s conversion failed: %s"):format(src_fmt:upper(), dst_fmt:upper(), rerr))
     return
   end
 

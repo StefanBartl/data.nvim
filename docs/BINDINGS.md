@@ -17,6 +17,9 @@ whole buffer).
 | `lines [--sep=X]` | yes | — | `--sep: STRING` | One `path: value` per leaf, nested keys dotted. |
 | `keys [--sep=X]` | yes | — | `--sep: STRING` | Only the (dotted) key paths, no values. |
 | `sort [indent]` | yes | `indent?: INT` | — | Pretty-print with object keys sorted (see `docs/commands.md`). |
+| `ndjson [indent]` | yes | `indent?: INT` | — | **`:JSON` only.** Pretty-print each line as its own JSON object. |
+| `to yaml` | yes | `format: STRING` | — | **`:JSON` only.** Convert the scope to YAML. |
+| `to json` | yes | `format: STRING` | — | **`:YAML` only.** Convert the scope to JSON. |
 
 Full action semantics: [commands.md](commands.md).
 

@@ -13,6 +13,9 @@ every action and flag below also has `<Tab>` completion.
 | `lines [--sep=X]` | One `path: value` per leaf; nested keys joined with `.` (or `--sep`). For XML this flattens the raw `{tag, attrs, children}` tree — see [scope.md](scope.md). |
 | `keys [--sep=X]` | Like `lines`, but only the paths — no values. |
 | `sort [indent]` | Pretty-print with sorted object keys (JSON/YAML) or sorted attributes (XML). |
+| `ndjson [indent]` | **`:JSON` only.** Pretty-print each line as its own JSON object, not the scope as one document. A line that fails to decode is left unchanged; the total skipped count is reported once. |
+| `to yaml` | **`:JSON` only.** Convert the scope to YAML, in place. |
+| `to json` | **`:YAML` only.** Convert the scope to JSON, in place. |
 
 **`sort` vs `pretty`:** identical output today, for all three formats. Neither
 JSON's nor YAML's decoder preserves the source's original key order, and both
@@ -22,11 +25,20 @@ and never reorders elements, so there's nothing a "sort" pass could change eithe
 order-preserving JSON/YAML decoder would give it real meaning), documented in each
 `data.format.*` module.
 
-**Scope:** no range → whole buffer, in place. A range (`:5,12JSON compact`) or a
-visual selection (`'<,'>YAML lines`) → only those lines are decoded and replaced;
-the rest of the buffer is untouched. Register scope (`--reg=`, output to a scratch
-split instead of the buffer) is planned but not implemented yet — see
-[scope.md](scope.md).
+**Why no `to xml`/`from xml`:** XML's decoded shape is a raw element tree
+(`{tag, attrs, children}`), not a plain map/array like JSON/YAML — converting
+either way would mean guessing a schema (which repeated sibling tag becomes an
+array? which attribute becomes "the" value?). See [architecture.md](architecture.md).
+
+**Scope:** an explicit range (`:5,12JSON compact`) or visual selection
+(`'<,'>YAML lines`) always wins. Without one: if the cursor sits inside a
+matching ` ```json `/` ```yaml `/` ```xml ` fenced code block and
+[color_my_ascii.nvim](https://github.com/StefanBartl/color_my_ascii.nvim) is
+installed, that block's interior is the scope (see
+[integrations.md](integrations.md)); otherwise the whole buffer. Either way,
+only the resolved lines are decoded and replaced. Register scope (`--reg=`,
+output to a scratch split instead of the buffer) is planned but not implemented
+yet — see [scope.md](scope.md).
 
 **Errors:** malformed input in the resolved scope leaves the buffer untouched and
 reports a notification (`[data] JSON decode failed: ...`) instead of partially

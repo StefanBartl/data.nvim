@@ -15,23 +15,31 @@
   (`{tag, attrs, children}`), not a JSON-like objectification of the document — see
   [architecture.md](architecture.md) for why that mapping is deliberately not
   attempted.
+- `:JSON ndjson` — pretty-print a buffer of one-JSON-object-per-line logs, each
+  line independently; a line that fails to decode is left unchanged rather than
+  aborting the rest.
+- `:JSON to yaml` / `:YAML to json` — convert the scope in place between the two
+  formats that share a plain-map/array decoded shape.
+- Scope to an enclosing ` ```json `/` ```yaml `/` ```xml ` fenced code block
+  (e.g. in a Markdown note) instead of the whole buffer, when
+  [color_my_ascii.nvim](https://github.com/StefanBartl/color_my_ascii.nvim) is
+  installed — see [integrations.md](integrations.md). Optional; a total no-op
+  without it.
 - Leave the buffer untouched on invalid input, with a clear error notification.
 
 ## Does not (yet)
-
-Per the project's phased concept, in order:
 
 1. **Register scope.** `:JSON pretty --reg=+` (read from a register, write to a
    scratch split instead of the buffer) is designed but not built.
 2. **Filter UI.** A `pickers.refine`-backed `:JSON filter` to reduce a large object
    down to the keys that matter (`user.*`, `error.stack`, ...) is designed but not
-   built.
-3. **Format conversion** (`:JSON to yaml`) between JSON and YAML — same flatten-based
-   Lua-value pipeline, not yet wired into a `to` action. XML is excluded: its
-   element/attribute/mixed-content shape has no unambiguous mapping to or from a
-   plain JSON/YAML map without a schema (see architecture.md).
-4. **`ndjson`** line-by-line mode for `:JSON` (support logs are often one JSON
-   object per line, not one big document).
+   built. A `diff.nvim` before/after preview once it exists depends on this.
+3. **`to xml`/`from xml`.** XML's decoded shape is a raw element tree
+   (`{tag, attrs, children}`), not a plain map/array like JSON/YAML — converting
+   either way would mean guessing a schema (which repeated sibling tag becomes an
+   array? which attribute becomes "the" value?) without one to guess from. See
+   [architecture.md](architecture.md). Not planned unless a concrete, honestly
+   lossy mapping is worth defining later.
 
 This plugin is deliberately thin: the JSON/YAML/XML/table primitives it uses
 (`lib.nvim.json`, `lib.lua.json.encode`, `lib.lua.yaml`, `lib.lua.xml`,

@@ -42,6 +42,10 @@ answers.
 - [All options](docs/configuration.md) — every `setup()` option and its default.
 - [Commands](docs/commands.md) / [Bindings cheatsheet](docs/BINDINGS.md)
 
+**Integrations**
+
+- [Optional integrations](docs/integrations.md) — fenced-block scope via color_my_ascii.nvim.
+
 **The Rest**
 
 - [What it does and what not](docs/scope.md) — JSON, YAML, and XML today; what's still planned.

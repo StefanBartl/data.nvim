@@ -16,6 +16,9 @@ require("data").setup({
     indent = 2,   -- default indent width for `:XML pretty`/`:XML sort`
     sep = ".",    -- default path separator for `:XML lines`/`:XML keys`
   },
+  fenced_scope = {
+    enable = true, -- scope to an enclosing ```json/```yaml/```xml block when color_my_ascii is installed
+  },
   keymaps = {
     preset = false, -- reserved: no default keymap preset exists yet
   },
@@ -25,6 +28,10 @@ require("data").setup({
 `indent`/`sep` are also overridable per invocation (`:JSON pretty 4`,
 `:YAML lines --sep=/`) — the config values are only the fallback when neither is
 given.
+
+`fenced_scope.enable = false` always uses whole-buffer scope, even with
+`color_my_ascii.nvim` installed and the cursor inside a matching fence — see
+[integrations.md](integrations.md).
 
 `keymaps.preset` is a placeholder for a future default keymap set; setting it to
 `true` today has no effect, since none is defined (see

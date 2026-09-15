@@ -34,9 +34,10 @@ to guess from. `lib.lua.xml.decode` deliberately does **not** attempt that: it
 returns the raw tree (`{tag, attrs, children}`), and `:XML lines`/`keys` flatten
 *that*, mechanical paths (`children.1.attrs.id`) and all, rather than pretending
 to a JSON-shaped summary the format can't honestly provide. This is also why
-JSON↔YAML format conversion (see [scope.md](scope.md)) is a reasonable future
-feature and JSON/YAML↔XML conversion is not: the former shares one IR shape, the
-latter doesn't.
+`:JSON to yaml`/`:YAML to json` (`data.convert`) exist and `to xml`/`from xml`
+don't: the former just decodes with one format's adapter and renders with the
+other's, because both work against the same plain-map/array shape; the latter
+has no shape to convert into or out of without guessing.
 
 ## Why `sort` isn't actually different from `pretty` yet
 
@@ -53,6 +54,28 @@ commands diverge was judged out of scope for what a "pretty-print my pasted log"
 plugin needs; `sort` is kept as an explicit, self-documenting route rather than
 removed, in case an order-preserving decoder is ever worth adding for its own
 sake.
+
+## `ndjson` is a scope-loop, not a fourth render primitive
+
+`:JSON ndjson` doesn't add a new mode to `data.format.json`'s `render()` -- it's
+handled entirely in `data.init`'s `run_ndjson`, which loops the resolved scope's
+lines and calls the *existing* `decode`/`render("pretty", ...)` pair once per
+line, substituting the original line unchanged wherever decode fails rather than
+aborting the whole invocation. Keeping this at the `data.run` layer (not inside
+`format/json.lua`) means the format module's contract stays simple ("one text
+in, one value out" / "one value in, some lines out") and per-line fault
+tolerance is a property of the *command*, not smuggled into the formatter.
+
+## Fenced-block scope is additive, not a scope rewrite
+
+`data.scope.resolve.lines` tries an explicit range first, exactly as before;
+only when there isn't one does it ask (via `pcall`) whether
+[color_my_ascii.nvim](https://github.com/StefanBartl/color_my_ascii.nvim)'s
+fence API knows about a block matching the requested format under the cursor.
+No color_my_ascii, no matching fence, or `fenced_scope.enable = false` all fall
+through to the pre-existing whole-buffer default unchanged -- the integration
+adds a scope source, it doesn't touch the two that were already there. See
+[integrations.md](integrations.md).
 
 ## Compound commands via `lib.nvim`'s composer
 
