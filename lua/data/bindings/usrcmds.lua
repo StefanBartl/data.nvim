@@ -12,6 +12,11 @@
 --- format-specific and opted into per verb: `ndjson` (JSON only) and `to`
 --- (JSON<->YAML conversion, not offered on XML -- see `data.convert`'s doc
 --- comment for why).
+---
+--- `filter` is offered on all three, unconditionally, same as `lines`/
+--- `keys`/`sort`: it filters the exact same `path_flatten` output those
+--- already render, so there is nothing format-specific about it -- see
+--- `data.filter`.
 
 local composer = require("lib.nvim.bindings.usercmd.composer")
 
@@ -85,6 +90,15 @@ local function make_routes(fmt, include_compact, include_ndjson, to_format)
     desc = "Pretty-print with object keys sorted (see data.format.<fmt> for why this equals 'pretty' today)",
     run = function(ctx)
       data.run(fmt, "sort", ctx.raw, { indent = ctx.args.indent })
+    end,
+  }
+  routes[#routes + 1] = {
+    path = { "filter" },
+    range = true,
+    flags = SEP_FLAG,
+    desc = "Interactively filter flattened path/value entries (requires pickers.nvim)",
+    run = function(ctx)
+      data.filter(fmt, ctx.raw, { sep = ctx.flags.sep })
     end,
   }
 

@@ -87,3 +87,9 @@ local function add_optional_dep(env_var, deps_name, marker)
 end
 
 add_optional_dep("COLOR_MY_ASCII_DIR", "color_my_ascii.nvim", "color_my_ascii")
+
+--- pickers.nvim is likewise an OPTIONAL soft dependency (`:JSON`/`:YAML`/
+--- `:XML filter`, see docs/integrations.md): its absence must never fail
+--- the run -- specs that need it check `pcall(require, "pickers.refine")`
+--- themselves and skip if it's missing.
+add_optional_dep("PICKERS_DIR", "pickers.nvim", "pickers.refine")

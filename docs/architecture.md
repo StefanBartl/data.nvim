@@ -77,6 +77,21 @@ through to the pre-existing whole-buffer default unchanged -- the integration
 adds a scope source, it doesn't touch the two that were already there. See
 [integrations.md](integrations.md).
 
+## `filter` is `lines` plus a borrowed filter stack, not a new pipeline
+
+`data.filter` doesn't add a fourth thing `path_flatten` needs to know how to
+do — it flattens exactly the way `lines` already does, then hands the result
+to [`pickers.nvim`](https://github.com/StefanBartl/pickers.nvim)'s
+`pickers.refine`, a pure model+UI module with no picker-engine dependency of
+its own (the same building block `replacer.nvim` already uses outside of any
+picker). data.nvim owns none of the filter-stack UI; it only supplies the
+items (`{path, line}`, one per flattened leaf) and renders whatever survives
+back as `lines`-style text. This is also why `filter` is offered on `:JSON`,
+`:YAML` and `:XML` alike with no per-format gating, unlike `compact`/`ndjson`/
+`to`: it operates on the same `path_flatten` output `lines`/`keys` already
+share across all three formats, so there is nothing format-specific to opt in
+or out of.
+
 ## Compound commands via `lib.nvim`'s composer
 
 `:JSON <action>`/`:YAML <action>`/`:XML <action>` (one verb per format, several

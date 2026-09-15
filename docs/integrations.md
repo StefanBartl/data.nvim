@@ -29,3 +29,18 @@ public [fence API](https://github.com/StefanBartl/color_my_ascii.nvim/blob/main/
 total no-op: `:checkhealth data` reports whether it was found, and whole-buffer
 scope is used either way. Disable the feature outright with
 `fenced_scope.enable = false` in [`setup()`](configuration.md).
+
+## pickers.nvim — `:JSON`/`:YAML`/`:XML filter`
+
+**Required for this one action, unlike every other integration on this page.**
+`filter` reduces the flattened `path`/`value` entries `lines`/`keys` already
+render down to the ones matching a clause stack, built interactively via
+[`pickers.nvim`](https://github.com/StefanBartl/pickers.nvim)'s
+[`pickers.refine`](https://github.com/StefanBartl/pickers.nvim/blob/main/docs/FEATURES/REFINE.md)
+module — a pure model+UI filter stack with no picker-engine dependency of its
+own (it never opens, closes or refreshes a picker; data.nvim doesn't either).
+
+Without `pickers.nvim` installed, every other `data.nvim` command still works
+exactly as documented; only `filter` fails, with a clear notification rather
+than silently doing nothing. `:checkhealth data` reports whether
+`pickers.refine` was found. See [commands.md](commands.md) for the prompt flow.

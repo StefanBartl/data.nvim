@@ -14,5 +14,6 @@ No external CLI tools, no other plugins required.
 [`color_my_ascii.nvim`](https://github.com/StefanBartl/color_my_ascii.nvim) is an
 optional soft dependency for fenced-block scope
 ([integrations.md](integrations.md)) — its absence is a silent, total no-op.
-`pickers.nvim` is an optional future integration for the planned filter UI
-([scope.md](scope.md)), not a dependency today.
+[`pickers.nvim`](https://github.com/StefanBartl/pickers.nvim) is an optional
+dependency required for exactly one action, `:JSON`/`:YAML`/`:XML filter`
+([integrations.md](integrations.md)) — every other command works without it.

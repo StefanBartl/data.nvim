@@ -240,6 +240,62 @@ function M.convert(src_fmt, dst_fmt, cmd, opts)
   vim.api.nvim_buf_set_lines(bufnr, s0, e0 + 1, false, out)
 end
 
+--- Interactively filter the resolved scope down to the flattened path/value
+--- entries matching a user-built `pickers.refine` clause stack (`:JSON
+--- filter`/`:YAML filter`/`:XML filter`), replacing the scope with the
+--- survivors' `lines`-style text. See `data.filter` for the actual clause
+--- loop; this only resolves scope/decode and writes the result back, same
+--- shape as `run`/`convert`, except the write happens later, from
+--- `data.filter`'s `on_done` callback, once the interactive part is over.
+---@param fmt string              # "json"|"yaml"|"xml"
+---@param cmd Lib.UserCommand.Args
+---@param opts? Data.RenderOpts
+---@return nil
+function M.filter(fmt, cmd, opts)
+  local formatter = formats.get(fmt)
+  if not formatter then
+    notify.error(("unknown format '%s'"):format(tostring(fmt)))
+    return
+  end
+
+  opts = opts or {}
+  local defaults = config.get(fmt) or {}
+  opts = {
+    indent = opt_or_default(opts.indent, defaults.indent),
+    sep = opt_or_default(opts.sep, defaults.sep),
+  }
+
+  local bufnr = vim.api.nvim_get_current_buf()
+  local s0, e0, src = resolve_scope(bufnr, cmd, fmt)
+  if not s0 then
+    return
+  end
+  ---@cast e0 integer
+  ---@cast src string[]
+
+  local value, derr = safe_call(formatter.decode, table.concat(src, "\n"))
+  if derr then
+    notify.error(("%s decode failed: %s"):format(fmt:upper(), derr))
+    return
+  end
+
+  require("data.filter").run(formatter, value, opts, function(out, ferr)
+    if ferr then
+      notify.error(("%s filter: %s"):format(fmt:upper(), ferr))
+      return
+    end
+    if not out then
+      -- Cancelled before any clause was added -- nothing to do, silently.
+      return
+    end
+    if #out == 0 then
+      notify.warn(("%s filter: no entries matched -- scope left unchanged"):format(fmt:upper()))
+      return
+    end
+    vim.api.nvim_buf_set_lines(bufnr, s0, e0 + 1, false, out)
+  end)
+end
+
 --- Configure data.nvim and wire up its user commands.
 ---@param opts? DataConfig
 ---@return nil

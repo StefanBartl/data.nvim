@@ -54,6 +54,7 @@ explicit `:N,M` range acts only on those lines.
     ndjson [indent]                :JSON only: pretty-print each line as its own object
     to yaml                        :JSON only: convert the scope to YAML
     to json                        :YAML only: convert the scope to JSON
+    filter [--sep=X]                interactively filter path/value entries (needs pickers.nvim)
 
 `sort` and `pretty` are currently identical output for all three formats:
 neither JSON's nor YAML's decoder preserves the source's original key order
@@ -103,8 +104,8 @@ Full cheatsheet (including `<Tab>` completion behavior): docs/BINDINGS.md.
     color_my_ascii.nvim installed -> that block's interior (|data-integrations|).
   - Otherwise -> the whole current buffer.
   - Register scope (`--reg=`, output to a scratch split instead of the
-    buffer) and a `pickers.refine`-based `:JSON filter` are designed but not
-    implemented yet -- see docs/scope.md in the repository.
+    buffer) is designed but not implemented yet -- see docs/scope.md in the
+    repository.
 
 ==============================================================================
 6. HEALTH                                                          *data-health*
@@ -133,6 +134,11 @@ color_my_ascii.nvim (optional): when installed and the cursor sits inside a
 fenced code block tagged ```json/```yaml/```xml with no explicit range given,
 that block's interior becomes the scope instead of the whole buffer. A total
 no-op without it. Disable with `fenced_scope.enable = false`. See
+docs/integrations.md.
+
+pickers.nvim (optional, required for `filter` specifically): backs
+`:JSON`/`:YAML`/`:XML filter` via `pickers.refine`. Every other command works
+without it; `filter` fails with a clear notification instead. See
 docs/integrations.md.
 
  vim:tw=78:ts=8:ft=help:norl:

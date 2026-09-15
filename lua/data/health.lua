@@ -77,6 +77,14 @@ function M.check()
       "color_my_ascii not found (optional) -- fenced-block scope is unavailable, whole-buffer scope is used instead"
     )
   end
+
+  if pcall(require, "pickers.refine") then
+    ok("pickers.nvim detected -- :JSON/:YAML/:XML filter available")
+  else
+    info(
+      "pickers.nvim not found (optional) -- :JSON/:YAML/:XML filter is unavailable; every other action still works"
+    )
+  end
 end
 
 return M

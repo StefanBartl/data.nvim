@@ -25,16 +25,19 @@
   [color_my_ascii.nvim](https://github.com/StefanBartl/color_my_ascii.nvim) is
   installed — see [integrations.md](integrations.md). Optional; a total no-op
   without it.
+- `:JSON filter` / `:YAML filter` / `:XML filter` — interactively reduce the
+  flattened `path`/`value` entries (the same ones `lines`/`keys` render) down
+  to the ones matching a `pickers.refine` clause stack (`user.*`, excludes
+  `error.stack`, ...), then replace the scope with the survivors. Requires
+  [pickers.nvim](https://github.com/StefanBartl/pickers.nvim) — see
+  [integrations.md](integrations.md); every other action works without it.
 - Leave the buffer untouched on invalid input, with a clear error notification.
 
 ## Does not (yet)
 
 1. **Register scope.** `:JSON pretty --reg=+` (read from a register, write to a
    scratch split instead of the buffer) is designed but not built.
-2. **Filter UI.** A `pickers.refine`-backed `:JSON filter` to reduce a large object
-   down to the keys that matter (`user.*`, `error.stack`, ...) is designed but not
-   built. A `diff.nvim` before/after preview once it exists depends on this.
-3. **`to xml`/`from xml`.** XML's decoded shape is a raw element tree
+2. **`to xml`/`from xml`.** XML's decoded shape is a raw element tree
    (`{tag, attrs, children}`), not a plain map/array like JSON/YAML — converting
    either way would mean guessing a schema (which repeated sibling tag becomes an
    array? which attribute becomes "the" value?) without one to guess from. See
@@ -55,5 +58,10 @@ command of its own and may one day call into data.nvim for that, never the other
 around.
 
 **[`pickers.nvim`](https://github.com/StefanBartl/pickers.nvim)** is a generic picker
-framework; its `refine` filter-stack module is the planned building block for
-`:JSON filter` (see "Does not" above), not something data.nvim depends on today.
+framework; its `refine` filter-stack module backs `:JSON filter`/`:YAML filter`/
+`:XML filter` (see "Does" above and [integrations.md](integrations.md)) — the one
+action in this plugin that does not work without it.
+
+**[`diff.nvim`](https://github.com/StefanBartl/diff.nvim)** before/after preview of
+a filter result is a natural next step now that `filter` exists, but is not built —
+`filter` replaces the scope in place today, the same way every other action does.

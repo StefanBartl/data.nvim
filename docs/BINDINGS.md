@@ -20,6 +20,7 @@ whole buffer).
 | `ndjson [indent]` | yes | `indent?: INT` | — | **`:JSON` only.** Pretty-print each line as its own JSON object. |
 | `to yaml` | yes | `format: STRING` | — | **`:JSON` only.** Convert the scope to YAML. |
 | `to json` | yes | `format: STRING` | — | **`:YAML` only.** Convert the scope to JSON. |
+| `filter [--sep=X]` | yes | — | `--sep: STRING` | Interactively filter flattened path/value entries. **Requires pickers.nvim.** |
 
 Full action semantics: [commands.md](commands.md).
 
