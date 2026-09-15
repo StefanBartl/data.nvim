@@ -37,6 +37,14 @@ local function fenced_block_scope(bufnr, fmt)
   if not langs then
     return nil, nil
   end
+  if vim.api.nvim_win_get_buf(0) ~= bufnr then
+    -- The cursor below is read from the *current* window; it only means
+    -- anything for `bufnr` when that window is actually displaying it. A
+    -- caller resolving scope for some other buffer (not the current one)
+    -- would otherwise silently get a fenced-block guess based on the wrong
+    -- buffer's cursor position instead of falling back to whole-buffer.
+    return nil, nil
+  end
   local ok, cma = pcall(require, "color_my_ascii")
   if not ok or type(cma.fences) ~= "table" then
     return nil, nil

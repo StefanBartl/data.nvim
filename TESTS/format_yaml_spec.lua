@@ -57,6 +57,16 @@ describe("data.format.yaml.render", function()
     assert.same({ "level", "user.id", "user.name" }, lines)
   end)
 
+  it("lines: an empty nested table leaf renders visibly, not as a blank value", function()
+    -- Regression: yaml.encode({}) returns "" (correct for a top-level empty
+    -- document), which display() used to pass straight through, rendering
+    -- an empty nested object/array leaf indistinguishable from an actual
+    -- empty-string leaf.
+    local lines = yaml_fmt.render({ a = {} }, "lines")
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "a: {}" }, lines)
+  end)
+
   it("compact is not supported and reports an error, not a crash", function()
     local lines, err = yaml_fmt.render(value, "compact")
     ---@diagnostic disable-next-line: undefined-field

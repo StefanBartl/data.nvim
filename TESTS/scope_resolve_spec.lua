@@ -124,4 +124,29 @@ describe("data.scope.resolve.lines -- fenced-block scope (color_my_ascii)", func
     package.loaded["data.config"] = nil
     require("data.config").setup(nil)
   end)
+
+  it("falls back to whole-buffer when bufnr isn't the current window's buffer", function()
+    -- Regression: the cursor is read from the *current* window, which
+    -- only means anything for `bufnr` when that window actually displays
+    -- it. A hidden buffer with its own fence (never focused) must not
+    -- borrow whatever the currently-focused window's cursor happens to be.
+    local other_bufnr = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(other_bufnr, 0, -1, false, {
+      "```json",
+      '{"a":1}',
+      "```",
+    })
+    -- bufnr (from before_each) stays the current buffer; put its cursor
+    -- inside where a fence interior would be, to prove it's ignored too.
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "```json", '{"a":1}', "```" })
+    vim.api.nvim_win_set_cursor(0, { 2, 0 })
+
+    local s0, e0 = resolve.lines(other_bufnr, { range = 0, line1 = 1, line2 = 1 }, "json")
+    ---@diagnostic disable-next-line: undefined-field
+    assert.equals(0, s0)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.equals(2, e0, "whole other_bufnr (3 lines), not a fenced guess from bufnr's cursor")
+
+    vim.api.nvim_buf_delete(other_bufnr, { force = true })
+  end)
 end)

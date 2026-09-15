@@ -91,6 +91,46 @@ describe(":JSON", function()
     assert.same({ "{", '    "a": 1', "}" }, lines)
   end)
 
+  it("config.json.sep is honored when --sep is given with no value", function()
+    -- Regression: `opts.sep or defaults.sep` treated an empty string (what
+    -- `--sep=` with nothing after the `=` parses to) as "given", silently
+    -- winning over the configured default instead of falling back to it.
+    package.loaded["data"] = nil
+    package.loaded["data.config"] = nil
+    package.loaded["data.bindings"] = nil
+    package.loaded["data.bindings.usrcmds"] = nil
+    require("data").setup({ json = { sep = "/" } })
+
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '{"user":{"id":1}}' })
+    vim.cmd("JSON lines --sep=")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "user/id: 1" }, lines)
+  end)
+
+  it("an unexpected runtime error during decode is caught, not raised past vim.cmd()", function()
+    -- Regression: formatter.decode/render used to be called with no pcall,
+    -- so a runtime error (e.g. a decoder's recursion-depth guard tripping,
+    -- or any other unforeseen throw) would surface as a raw Vim error
+    -- instead of the graceful notify-and-leave-untouched every other
+    -- failure path in this module gets.
+    local json_fmt = require("data.format.json")
+    local original_decode = json_fmt.decode
+    json_fmt.decode = function()
+      error("boom: simulated unexpected decode failure")
+    end
+
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '{"a":1}' })
+    local cmd_ok = pcall(vim.cmd, "JSON")
+    json_fmt.decode = original_decode
+
+    ---@diagnostic disable-next-line: undefined-field
+    assert.is_true(cmd_ok, "vim.cmd('JSON') itself does not raise -- the error is caught")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ '{"a":1}' }, lines, "buffer is left untouched when decode throws unexpectedly")
+  end)
+
   it(":JSON ndjson pretty-prints each line as its own object", function()
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '{"a":1}', '{"b":2}' })
     vim.cmd("JSON ndjson")

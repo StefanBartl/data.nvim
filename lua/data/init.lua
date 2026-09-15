@@ -32,6 +32,45 @@ local notify = {
 }
 
 ---@internal
+--- Resolve a per-invocation option against its configured default. Falls
+--- back on `nil` OR an empty string: the composer's `--sep=` flag (no value
+--- after the `=`) parses to `""`, which is truthy in Lua and would
+--- otherwise silently win over the configured separator instead of falling
+--- back to it.
+---@param v any
+---@param default any
+---@return any
+local function opt_or_default(v, default)
+  if v == nil or v == "" then
+    return default
+  end
+  return v
+end
+
+---@internal
+--- Call `fn(a, b, c)` guarded by `pcall`, collapsing an unexpected runtime
+--- error into the same `nil, err` shape `formatter.decode`/`formatter.render`
+--- already use. Neither `lib.lua.xml`/`lib.lua.yaml`'s decoders/encoders nor
+--- `lib.nvim.json`'s null-normalization throw under normal use, but each has
+--- (or had) a recursion-depth guard as its only defense against a
+--- pathologically deep document -- this is the belt to that suspenders, so a
+--- gap in one of those guards surfaces here as a clean notification instead
+--- of a raw Vim error escaping past the caller's `vim.cmd()`.
+---@param fn function
+---@param a any
+---@param b any
+---@param c any
+---@return any result_or_nil
+---@return string|nil err
+local function safe_call(fn, a, b, c)
+  local ok, r1, r2 = pcall(fn, a, b, c)
+  if not ok then
+    return nil, tostring(r1)
+  end
+  return r1, r2
+end
+
+---@internal
 --- Shared prelude for `run`/`convert`: modifiable check, scope resolution,
 --- non-empty check. Already notifies on failure, so callers only need to
 --- check for a nil `s0`.
@@ -71,10 +110,10 @@ local function run_ndjson(formatter, fmt, bufnr, s0, e0, src, opts)
   local out, skipped = {}, 0
   for _, line in ipairs(src) do
     if line:find("%S") then
-      local value, derr = formatter.decode(line)
+      local value, derr = safe_call(formatter.decode, line)
       local rendered, rerr
       if not derr then
-        rendered, rerr = formatter.render(value, "pretty", opts)
+        rendered, rerr = safe_call(formatter.render, value, "pretty", opts)
       end
       if rendered and not rerr then
         for _, rl in ipairs(rendered) do
@@ -120,7 +159,10 @@ function M.run(fmt, mode, cmd, opts)
   -- user-set json.indent silently had no effect.
   opts = opts or {}
   local defaults = config.get(fmt) or {}
-  opts = { indent = opts.indent or defaults.indent, sep = opts.sep or defaults.sep }
+  opts = {
+    indent = opt_or_default(opts.indent, defaults.indent),
+    sep = opt_or_default(opts.sep, defaults.sep),
+  }
 
   local bufnr = vim.api.nvim_get_current_buf()
   local s0, e0, src = resolve_scope(bufnr, cmd, fmt)
@@ -135,13 +177,13 @@ function M.run(fmt, mode, cmd, opts)
     return
   end
 
-  local value, derr = formatter.decode(table.concat(src, "\n"))
+  local value, derr = safe_call(formatter.decode, table.concat(src, "\n"))
   if derr then
     notify.error(("%s decode failed: %s"):format(fmt:upper(), derr))
     return
   end
 
-  local out, rerr = formatter.render(value, mode, opts)
+  local out, rerr = safe_call(formatter.render, value, mode, opts)
   if not out then
     notify.error(("%s render failed: %s"):format(fmt:upper(), rerr))
     return
@@ -170,7 +212,10 @@ function M.convert(src_fmt, dst_fmt, cmd, opts)
 
   opts = opts or {}
   local defaults = config.get(dst_fmt) or {}
-  opts = { indent = opts.indent or defaults.indent, sep = opts.sep or defaults.sep }
+  opts = {
+    indent = opt_or_default(opts.indent, defaults.indent),
+    sep = opt_or_default(opts.sep, defaults.sep),
+  }
 
   local bufnr = vim.api.nvim_get_current_buf()
   local s0, e0, src = resolve_scope(bufnr, cmd, src_fmt)
@@ -180,13 +225,13 @@ function M.convert(src_fmt, dst_fmt, cmd, opts)
   ---@cast e0 integer
   ---@cast src string[]
 
-  local value, derr = src_formatter.decode(table.concat(src, "\n"))
+  local value, derr = safe_call(src_formatter.decode, table.concat(src, "\n"))
   if derr then
     notify.error(("%s decode failed: %s"):format(src_fmt:upper(), derr))
     return
   end
 
-  local out, rerr = dst_formatter.render(value, "pretty", opts)
+  local out, rerr = safe_call(dst_formatter.render, value, "pretty", opts)
   if not out then
     notify.error(("%s -> %s conversion failed: %s"):format(src_fmt:upper(), dst_fmt:upper(), rerr))
     return

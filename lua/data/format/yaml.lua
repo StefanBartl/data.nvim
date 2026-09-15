@@ -31,6 +31,13 @@ local function display(v)
     return v
   end
   if t == "table" then
+    if next(v) == nil then
+      -- `yaml.encode({})` returns "" (an empty document, correct at the top
+      -- level -- see that module's own doc comment), which would otherwise
+      -- render an empty nested object/array leaf as a blank string here,
+      -- indistinguishable from an actual empty-string leaf value.
+      return "{}"
+    end
     return (yaml.encode(v)) or vim.inspect(v)
   end
   return tostring(v)
