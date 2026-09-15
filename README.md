@@ -14,6 +14,9 @@
                                                .nvim
 ```
 
+> Pairs well with [pickers.nvim](https://github.com/StefanBartl/pickers.nvim) —
+> `:JSON`/`:YAML`/`:XML filter` is built on its `pickers.refine`.
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Neovim](https://img.shields.io/badge/Neovim-0.9%2B-57A143?logo=neovim&logoColor=white)](https://neovim.io)
 [![Lua](https://img.shields.io/badge/Lua-5.1%2FLuaJIT-2C2D72?logo=lua&logoColor=white)](https://www.lua.org)

@@ -1,3 +1,6 @@
+-- Test code: when something here comes back nil -- a require, a decode, a
+-- format lookup -- this file must crash and name it. The nil guards LuaLS
+-- asks for below would hide the very failure this spec exists to catch.
 ---@diagnostic disable: need-check-nil
 -- TESTS/filter_spec.lua — :JSON/:YAML/:XML filter (pickers.refine-backed)
 
@@ -130,6 +133,11 @@ describe(":JSON/:YAML/:XML filter", function()
   ---@param negate boolean
   local function script_one_clause(field, term, negate)
     local select_calls = 0
+    --- Test double: this file reassigns `vim.ui.select`/`vim.ui.input`
+    --- several times (once here, again standalone in a few `it` blocks
+    --- below) to script pickers.refine's prompt -- each is restored via
+    --- `orig_select`/`orig_input` in `after_each` before the next test runs.
+    ---@diagnostic disable-next-line: duplicate-set-field
     vim.ui.select = function(choices, _select_opts, cb)
       select_calls = select_calls + 1
       if select_calls > 1 then
@@ -142,6 +150,8 @@ describe(":JSON/:YAML/:XML filter", function()
       end
       cb(nil)
     end
+    --- Test double: same rationale as `vim.ui.select` above.
+    ---@diagnostic disable-next-line: duplicate-set-field
     vim.ui.input = function(_input_opts, cb)
       cb(term)
     end
@@ -179,6 +189,8 @@ describe(":JSON/:YAML/:XML filter", function()
 
   it("cancelling before adding any clause leaves the scope untouched", function()
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '{"a":1}' })
+    --- Test double: same rationale as `script_one_clause`'s above.
+    ---@diagnostic disable-next-line: duplicate-set-field
     vim.ui.select = function(_choices, _select_opts, cb)
       cb(nil)
     end
@@ -221,6 +233,8 @@ describe(":JSON/:YAML/:XML filter", function()
       })
 
       local select_calls = 0
+      --- Test double: same rationale as `script_one_clause`'s above.
+      ---@diagnostic disable-next-line: duplicate-set-field
       vim.ui.select = function(choices, _select_opts, cb)
         select_calls = select_calls + 1
         if select_calls == 1 then
@@ -238,6 +252,8 @@ describe(":JSON/:YAML/:XML filter", function()
         vim.api.nvim_buf_set_lines(bufnr, 0, 0, false, { "INSERTED" })
         cb(nil)
       end
+      --- Test double: same rationale as `vim.ui.select` above.
+      ---@diagnostic disable-next-line: duplicate-set-field
       vim.ui.input = function(_input_opts, cb)
         cb("user")
       end
@@ -253,6 +269,8 @@ describe(":JSON/:YAML/:XML filter", function()
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '{"a":1}' })
 
     local select_calls = 0
+    --- Test double: same rationale as `script_one_clause`'s above.
+    ---@diagnostic disable-next-line: duplicate-set-field
     vim.ui.select = function(choices, _select_opts, cb)
       select_calls = select_calls + 1
       if select_calls == 1 then
@@ -267,6 +285,8 @@ describe(":JSON/:YAML/:XML filter", function()
       vim.api.nvim_buf_delete(bufnr, { force = true })
       cb(nil)
     end
+    --- Test double: same rationale as `vim.ui.select` above.
+    ---@diagnostic disable-next-line: duplicate-set-field
     vim.ui.input = function(_input_opts, cb)
       cb("a")
     end

@@ -46,6 +46,10 @@ describe("data.config", function()
   it("warns about an unknown top-level key instead of silently accepting it", function()
     local calls = {}
     local orig = vim.notify
+    --- Test double: reassigning `vim.notify` a second time in this file
+    --- (see the next `it` below) is intentional -- each capture is
+    --- restored before the test ends, they never run concurrently.
+    ---@diagnostic disable-next-line: duplicate-set-field
     vim.notify = function(msg)
       calls[#calls + 1] = msg
     end
@@ -70,6 +74,8 @@ describe("data.config", function()
   it("warns about a wrong-typed leaf value instead of silently accepting it", function()
     local calls = {}
     local orig = vim.notify
+    --- Test double: same rationale as the previous `it`'s reassignment.
+    ---@diagnostic disable-next-line: duplicate-set-field
     vim.notify = function(msg)
       calls[#calls + 1] = msg
     end

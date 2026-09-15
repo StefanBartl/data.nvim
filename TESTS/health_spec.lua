@@ -1,3 +1,6 @@
+-- Test code: when something here comes back nil -- a require, a decode, a
+-- format lookup -- this file must crash and name it. The nil guards LuaLS
+-- asks for below would hide the very failure this spec exists to catch.
 ---@diagnostic disable: need-check-nil
 -- TESTS/health_spec.lua — data.health (:checkhealth data)
 
