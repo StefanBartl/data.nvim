@@ -26,6 +26,15 @@ describe("data.filter.run", function()
   end)
 
   it("an unexpected runtime error during path_flatten is caught, not raised", function()
+    -- Stub pickers.refine present regardless of whether the real plugin is
+    -- on this machine's rtp -- this test targets the path_flatten failure
+    -- specifically, and must not depend on pickers.nvim actually being
+    -- installed to reach that code path.
+    package.loaded["pickers.refine"] = nil
+    package.preload["pickers.refine"] = function()
+      return {}
+    end
+
     local tables_mod = require("lib.lua.tables")
     local original_flatten = tables_mod.path_flatten
     tables_mod.path_flatten = function()
@@ -40,6 +49,8 @@ describe("data.filter.run", function()
     end)
 
     tables_mod.path_flatten = original_flatten
+    package.preload["pickers.refine"] = nil
+    package.loaded["pickers.refine"] = nil
 
     assert.is_true(ok, "data.filter.run itself does not raise -- the error is caught")
     assert.is_nil(got_out)
@@ -47,6 +58,14 @@ describe("data.filter.run", function()
   end)
 
   it("an unexpected runtime error during render is caught, not raised", function()
+    -- Same rationale as the path_flatten test above: stub pickers.refine so
+    -- this test's target failure (render) is reached independent of whether
+    -- pickers.nvim is actually installed.
+    package.loaded["pickers.refine"] = nil
+    package.preload["pickers.refine"] = function()
+      return {}
+    end
+
     local json_fmt = require("data.format.json")
     local original_render = json_fmt.render
     json_fmt.render = function()
@@ -60,6 +79,8 @@ describe("data.filter.run", function()
     end)
 
     json_fmt.render = original_render
+    package.preload["pickers.refine"] = nil
+    package.loaded["pickers.refine"] = nil
 
     assert.is_true(ok, "data.filter.run itself does not raise -- the error is caught")
     assert.is_nil(got_out)
