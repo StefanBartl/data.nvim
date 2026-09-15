@@ -12,6 +12,10 @@ require("data").setup({
     indent = 2,   -- default indent width for `:YAML pretty`/`:YAML sort`
     sep = ".",    -- default path separator for `:YAML lines`/`:YAML keys`
   },
+  xml = {
+    indent = 2,   -- default indent width for `:XML pretty`/`:XML sort`
+    sep = ".",    -- default path separator for `:XML lines`/`:XML keys`
+  },
   keymaps = {
     preset = false, -- reserved: no default keymap preset exists yet
   },

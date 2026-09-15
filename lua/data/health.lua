@@ -1,11 +1,12 @@
 ---@module 'data.health'
 --- `:checkhealth data` diagnostics.
 ---
---- Reports Neovim version, `lib.nvim` availability (required -- the `:JSON`
---- command layer is built on `lib.nvim.bindings.usercmd.composer`), and
---- whether the installed `lib.nvim` has `tables.path_flatten` (needed by
---- `:JSON lines`/`keys`; only present from the version data.nvim shipped
---- alongside). Read-only: never mutates state.
+--- Reports Neovim version, `lib.nvim` availability (required -- the command
+--- layer is built on `lib.nvim.bindings.usercmd.composer`), and whether the
+--- installed `lib.nvim` has `tables.path_flatten` (`lines`/`keys`, every
+--- format), `lib.lua.yaml.encode` (`:YAML`), and `lib.lua.xml` (`:XML`) --
+--- each only present from the version data.nvim shipped alongside the
+--- feature that needs it. Read-only: never mutates state.
 
 local M = {}
 
@@ -35,7 +36,7 @@ function M.check()
 
   local tables_ok, tables_mod = pcall(require, "lib.lua.tables")
   if tables_ok and type(tables_mod.path_flatten) == "function" then
-    ok("lib.lua.tables.path_flatten available (:JSON/:YAML lines/keys)")
+    ok("lib.lua.tables.path_flatten available (:JSON/:YAML/:XML lines/keys)")
   else
     err(
       "lib.lua.tables.path_flatten not found -- lib.nvim is outdated",
@@ -53,7 +54,19 @@ function M.check()
     )
   end
 
-  info("xml format: not implemented yet -- lib.nvim has no XML module (see docs/scope.md)")
+  local xml_ok, xml_mod = pcall(require, "lib.lua.xml")
+  if xml_ok and type(xml_mod.decode) == "function" and type(xml_mod.encode) == "function" then
+    ok("lib.lua.xml available (:XML pretty/compact/lines/keys/sort)")
+  else
+    err(
+      "lib.lua.xml not found -- lib.nvim is outdated",
+      { "Update StefanBartl/lib.nvim to a version that ships lib.lua.xml" }
+    )
+  end
+
+  info(
+    "yaml/xml are deliberately minimal subsets (no anchors/flow-style/DTDs/namespaces) -- see docs/scope.md"
+  )
 end
 
 return M

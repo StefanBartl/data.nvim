@@ -9,12 +9,17 @@
 ---@field indent integer # Default indent width for `pretty`/`sort` (default 2).
 ---@field sep string     # Default path separator for `lines`/`keys` (default ".").
 
+---@class DataXmlConfig
+---@field indent integer # Default indent width for `pretty`/`sort` (default 2).
+---@field sep string     # Default path separator for `lines`/`keys` (default ".").
+
 ---@class DataKeymapsConfig
 ---@field preset boolean # Reserved for a future default keymap preset. Always false today: data.nvim's actions are Ex commands, not motions, so there is no default preset yet.
 
 ---@class DataConfig
 ---@field json DataJsonConfig
 ---@field yaml DataYamlConfig
+---@field xml DataXmlConfig
 ---@field keymaps DataKeymapsConfig
 
 ---@alias Data.RenderMode "pretty"|"compact"|"lines"|"keys"|"sort"

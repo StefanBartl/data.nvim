@@ -3,11 +3,12 @@
 - Neovim **0.9+** (uses `vim.json.decode`/`vim.json.encode`'s `vim.NIL` sentinel and
   `vim.health`).
 - [`lib.nvim`](https://github.com/StefanBartl/lib.nvim) — **hard dependency**, not
-  optional. data.nvim's `:JSON`/`:YAML` commands are built on
-  `lib.nvim.bindings.usercmd.composer`; `lines`/`keys` need `lib.lua.tables.path_flatten`
-  and `:YAML` needs `lib.lua.yaml.encode` (both ship with lib.nvim as of the version
-  released alongside data.nvim's YAML support — `:checkhealth data` reports either one
-  missing explicitly rather than failing silently).
+  optional. data.nvim's `:JSON`/`:YAML`/`:XML` commands are built on
+  `lib.nvim.bindings.usercmd.composer`; `lines`/`keys` need `lib.lua.tables.path_flatten`,
+  `:YAML` needs `lib.lua.yaml.encode`, and `:XML` needs `lib.lua.xml` (all ship with
+  lib.nvim as of the version released alongside the data.nvim feature that needs them —
+  `:checkhealth data` reports any of them missing explicitly rather than failing
+  silently).
 
 No external CLI tools, no other plugins required. `pickers.nvim` is an optional
 future integration for the planned filter UI ([scope.md](scope.md)), not a

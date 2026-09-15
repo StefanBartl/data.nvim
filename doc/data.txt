@@ -15,10 +15,9 @@ CONTENTS                                                        *data-contents*
 ==============================================================================
 1. INTRODUCTION                                             *data-introduction*
 
-data.nvim reformats structured data (JSON and YAML today; XML planned) in
-place, either the whole buffer or a Visual selection: pretty-print, collapse
-to one line (JSON only), or flatten nested keys onto one `path: value` line
-each.
+data.nvim reformats structured data (JSON, YAML, XML) in place, either the
+whole buffer or a Visual selection: pretty-print, collapse to one line
+(JSON/XML), or flatten nested keys onto one `path: value` line each.
 
 Requires Neovim 0.9+ and `lib.nvim` (hard dependency).
 
@@ -32,29 +31,31 @@ Requires Neovim 0.9+ and `lib.nvim` (hard dependency).
     })
 <
 Calling setup() merges your options over the defaults and defines the
-`:JSON`/`:YAML` user commands. setup() is safe to call once.
+`:JSON`/`:YAML`/`:XML` user commands. setup() is safe to call once.
 
 ==============================================================================
 3. COMMANDS                                                    *data-commands*
 
-                                                                *:JSON* *:YAML*
+                                                        *:JSON* *:YAML* *:XML*
 :[range]JSON [action] [args] [flags]
 :[range]YAML [action] [args] [flags]
+:[range]XML  [action] [args] [flags]
 
 Range-aware: no range acts on the whole buffer, a Visual selection or an
 explicit `:N,M` range acts only on those lines.
 
-    :JSON / :YAML                same as pretty
+    :JSON / :YAML / :XML         same as pretty
     pretty [indent]               pretty-print (default 2-space indent)
-    compact                        collapse onto one line (JSON only)
+    compact                        collapse onto one line (JSON/XML only)
     lines [--sep=X]                one "path: value" per leaf, dotted keys
     keys [--sep=X]                 only the (dotted) key paths, no values
     sort [indent]                  pretty-print with sorted object keys
 
-`sort` and `pretty` are currently identical output for both formats: neither
-decoder preserves the source's original key order, and both encoders sort
-keys by default. See |data-lib| and `data.format.json`/`data.format.yaml`'s
-doc comments.
+`sort` and `pretty` are currently identical output for all three formats:
+neither JSON's nor YAML's decoder preserves the source's original key order
+and both encoders sort keys by default; XML's encoder always sorts
+attributes and never reorders elements. See |data-lib| and each
+`data.format.*` module's own doc comment.
 
 Malformed input in the resolved scope leaves the buffer untouched and
 reports an error notification instead of partially overwriting anything.
@@ -73,6 +74,10 @@ Full cheatsheet (including `<Tab>` completion behavior): docs/BINDINGS.md.
       yaml = {
         indent = 2,   -- default indent for :YAML pretty/sort
         sep = ".",    -- default path separator for :YAML lines/keys
+      },
+      xml = {
+        indent = 2,   -- default indent for :XML pretty/sort
+        sep = ".",    -- default path separator for :XML lines/keys
       },
       keymaps = {
         preset = false, -- reserved; no default keymap preset exists yet
@@ -97,17 +102,19 @@ Full cheatsheet (including `<Tab>` completion behavior): docs/BINDINGS.md.
 
 `:checkhealth data` reports Neovim version, whether `lib.nvim` is installed
 (required), and whether it ships `lib.lua.tables.path_flatten` (required by
-`lines`/`keys`) and `lib.lua.yaml.encode` (required by `:YAML`).
+`lines`/`keys`), `lib.lua.yaml.encode` (required by `:YAML`), and
+`lib.lua.xml` (required by `:XML`).
 
 ==============================================================================
 7. LIB.NVIM INTEGRATION                                               *data-lib*
 
 data.nvim is a thin editor layer: JSON decode/encode
 (`lib.nvim.json`, `lib.lua.json.encode`), YAML decode/encode
-(`lib.lua.yaml`), the shared null sentinel (`lib.lua.null`), and the
-recursive path-flattening `lines`/`keys` need (`lib.lua.tables.path_flatten`)
-all live in https://github.com/StefanBartl/lib.nvim, not in this plugin. The
-`:JSON`/`:YAML` commands themselves are built on
+(`lib.lua.yaml`), XML decode/encode (`lib.lua.xml`), the shared null
+sentinel (`lib.lua.null`), and the recursive path-flattening `lines`/`keys`
+need (`lib.lua.tables.path_flatten`) all live in
+https://github.com/StefanBartl/lib.nvim, not in this plugin. The
+`:JSON`/`:YAML`/`:XML` commands themselves are built on
 `lib.nvim.bindings.usercmd.composer`.
 
  vim:tw=78:ts=8:ft=help:norl:

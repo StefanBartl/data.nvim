@@ -7,6 +7,7 @@ local M = {}
 M.formats = {
   json = require("data.format.json"),
   yaml = require("data.format.yaml"),
+  xml = require("data.format.xml"),
 }
 
 --- Look up a registered formatter by name.

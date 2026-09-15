@@ -14,6 +14,10 @@ local DEFAULTS = {
     indent = 2,
     sep = ".",
   },
+  xml = {
+    indent = 2,
+    sep = ".",
+  },
   keymaps = {
     preset = false,
   },

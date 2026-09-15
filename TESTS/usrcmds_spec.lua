@@ -145,3 +145,59 @@ describe(":YAML", function()
     assert.same({ "a: 1", "  b: 2" }, lines)
   end)
 end)
+
+describe(":XML", function()
+  local bufnr
+
+  before_each(function()
+    for _, name in ipairs({ "data", "data.config", "data.bindings", "data.bindings.usrcmds" }) do
+      package.loaded[name] = nil
+    end
+    require("data").setup()
+
+    bufnr = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_set_current_buf(bufnr)
+  end)
+
+  after_each(function()
+    vim.api.nvim_buf_delete(bufnr, { force = true })
+  end)
+
+  it("bare :XML pretty-prints the whole buffer", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '<a id="1"><b>x</b></a>' })
+    vim.cmd("XML")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ '<a id="1">', "  <b>x</b>", "</a>" }, lines)
+  end)
+
+  it(":XML compact collapses onto one line", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '<a id="1">', "  <b>x</b>", "</a>" })
+    vim.cmd("XML compact")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ '<a id="1"><b>x</b></a>' }, lines)
+  end)
+
+  it(":XML keys flattens the raw element tree", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "<a><b>1</b></a>" })
+    vim.cmd("XML keys")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({
+      "attrs",
+      "children.1.attrs",
+      "children.1.children.1",
+      "children.1.tag",
+      "tag",
+    }, lines)
+  end)
+
+  it("malformed XML (mismatched closing tag) leaves the buffer untouched", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "<a><b></c></a>" })
+    vim.cmd("XML")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "<a><b></c></a>" }, lines)
+  end)
+end)

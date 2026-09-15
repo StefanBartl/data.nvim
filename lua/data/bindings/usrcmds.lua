@@ -4,11 +4,10 @@
 --- or visual selection = only those lines), built via lib.nvim's composer
 --- (`:Verb sub …` + `<Tab>` completion + Markdown docgen).
 ---
---- Both verbs share one route factory (`make_routes`) since their actions
---- are identical apart from `compact` (JSON only -- see `data.format.yaml`'s
---- doc comment for why YAML's subset has no single-line form). `:XML` is
---- planned (Phase 3 in the project concept) but not registered yet -- there
---- is no XML module in lib.nvim to back it.
+--- All three verbs share one route factory (`make_routes`) since their
+--- actions are identical apart from `compact` -- JSON and XML support it,
+--- YAML doesn't (see `data.format.yaml`'s doc comment: its subset has no
+--- single-line flow-style form to collapse into).
 
 local composer = require("lib.nvim.bindings.usercmd.composer")
 
@@ -104,11 +103,12 @@ local function make_verb(fmt, cmd_name, include_compact)
   })
 end
 
---- Create the `:JSON` and `:YAML` verbs.
+--- Create the `:JSON`, `:YAML`, and `:XML` verbs.
 ---@return nil
 function M.setup()
   make_verb("json", "JSON", true)
   make_verb("yaml", "YAML", false)
+  make_verb("xml", "XML", true)
 end
 
 return M
