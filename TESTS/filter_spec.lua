@@ -24,6 +24,47 @@ describe("data.filter.run", function()
     assert.is_nil(got_out)
     assert.matches("pickers.nvim", got_err)
   end)
+
+  it("an unexpected runtime error during path_flatten is caught, not raised", function()
+    local tables_mod = require("lib.lua.tables")
+    local original_flatten = tables_mod.path_flatten
+    tables_mod.path_flatten = function()
+      error("boom: simulated path_flatten failure")
+    end
+
+    local filter = require("data.filter")
+    local json_fmt = require("data.format.json")
+    local got_out, got_err
+    local ok = pcall(filter.run, json_fmt, { a = 1 }, {}, function(out, err)
+      got_out, got_err = out, err
+    end)
+
+    tables_mod.path_flatten = original_flatten
+
+    assert.is_true(ok, "data.filter.run itself does not raise -- the error is caught")
+    assert.is_nil(got_out)
+    assert.matches("boom", got_err)
+  end)
+
+  it("an unexpected runtime error during render is caught, not raised", function()
+    local json_fmt = require("data.format.json")
+    local original_render = json_fmt.render
+    json_fmt.render = function()
+      error("boom: simulated render failure")
+    end
+
+    local filter = require("data.filter")
+    local got_out, got_err
+    local ok = pcall(filter.run, json_fmt, { a = 1 }, {}, function(out, err)
+      got_out, got_err = out, err
+    end)
+
+    json_fmt.render = original_render
+
+    assert.is_true(ok, "data.filter.run itself does not raise -- the error is caught")
+    assert.is_nil(got_out)
+    assert.matches("boom", got_err)
+  end)
 end)
 
 describe(":JSON/:YAML/:XML filter", function()
@@ -54,7 +95,9 @@ describe(":JSON/:YAML/:XML filter", function()
 
   after_each(function()
     vim.ui.select, vim.ui.input = orig_select, orig_input
-    vim.api.nvim_buf_delete(bufnr, { force = true })
+    if vim.api.nvim_buf_is_valid(bufnr) then
+      vim.api.nvim_buf_delete(bufnr, { force = true })
+    end
   end)
 
   --- Script the refine prompt for exactly one "add a <field>
@@ -145,5 +188,69 @@ describe(":JSON/:YAML/:XML filter", function()
     vim.cmd("XML filter")
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
     assert.same({ "children.1.tag: b", "children.2.tag: c" }, lines)
+  end)
+
+  it(
+    "a buffer edit made between clause rounds still lands on the shifted scope (extmark, not a stale line pair)",
+    function()
+      vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
+        "before",
+        '{"user":{"id":1,"name":"x"},"level":"error"}',
+        "after",
+      })
+
+      local select_calls = 0
+      vim.ui.select = function(choices, _select_opts, cb)
+        select_calls = select_calls + 1
+        if select_calls == 1 then
+          for _, c in ipairs(choices) do
+            if c.kind == "add" and c.field == "path" and c.negate == false then
+              return cb(c)
+            end
+          end
+          return cb(nil)
+        end
+        -- Round 2: something else edits the buffer while the prompt is
+        -- still open, shifting the scope down by one line -- before the
+        -- extmark fix, the eventual write still targeted the original,
+        -- now-stale line numbers.
+        vim.api.nvim_buf_set_lines(bufnr, 0, 0, false, { "INSERTED" })
+        cb(nil)
+      end
+      vim.ui.input = function(_input_opts, cb)
+        cb("user")
+      end
+
+      vim.cmd("2JSON filter")
+
+      local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+      assert.same({ "INSERTED", "before", "user.id: 1", "user.name: x", "after" }, lines)
+    end
+  )
+
+  it("does not raise when the buffer is closed before the filter finishes", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '{"a":1}' })
+
+    local select_calls = 0
+    vim.ui.select = function(choices, _select_opts, cb)
+      select_calls = select_calls + 1
+      if select_calls == 1 then
+        for _, c in ipairs(choices) do
+          if c.kind == "add" and c.field == "path" and c.negate == false then
+            return cb(c)
+          end
+        end
+        return cb(nil)
+      end
+      -- Round 2: the buffer is closed while the prompt is still open.
+      vim.api.nvim_buf_delete(bufnr, { force = true })
+      cb(nil)
+    end
+    vim.ui.input = function(_input_opts, cb)
+      cb("a")
+    end
+
+    local ok = pcall(vim.cmd, "JSON filter")
+    assert.is_true(ok, "closing the buffer mid-filter must not raise past vim.cmd()")
   end)
 end)

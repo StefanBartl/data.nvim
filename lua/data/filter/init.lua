@@ -14,6 +14,29 @@
 local M = {}
 
 ---@internal
+--- Call `fn(a, b, c)` guarded by `pcall`, collapsing an unexpected runtime
+--- error into the same `nil, err` shape `path_flatten`/`formatter.render`
+--- already use for an ordinary failure. The same belt-and-suspenders
+--- `data.init`'s own `safe_call` applies to every other decode/render call
+--- in this plugin -- duplicated here (not required from `data.init`) so
+--- `data.filter` doesn't have to pull in the whole facade module just for
+--- this, mirroring how `format/json.lua`/`format/yaml.lua`/`format/xml.lua`
+--- each keep their own small `display()` rather than sharing one.
+---@param fn function
+---@param a any
+---@param b any
+---@param c any
+---@return any result_or_nil
+---@return string|nil err
+local function safe_call(fn, a, b, c)
+  local ok, r1, r2 = pcall(fn, a, b, c)
+  if not ok then
+    return nil, tostring(r1)
+  end
+  return r1, r2
+end
+
+---@internal
 --- One `pickers.refine` item per flattened leaf: `path` for path-only
 --- clauses, `line` for the pre-rendered "path: value" text (exactly what
 --- `<Verb> lines` would have shown for the same leaf), so a clause can also
@@ -68,13 +91,13 @@ function M.run(formatter, value, opts, on_done)
   -- `path_flatten` pass matter is already well past what an interactive,
   -- human-driven filter prompt is comfortable to use on.
   local tables = require("lib.lua.tables")
-  local items, ferr = tables.path_flatten(value, { sep = opts.sep })
+  local items, ferr = safe_call(tables.path_flatten, value, { sep = opts.sep })
   if not items then
     on_done(nil, ferr)
     return
   end
 
-  local rendered, rerr = formatter.render(value, "lines", opts)
+  local rendered, rerr = safe_call(formatter.render, value, "lines", opts)
   if not rendered then
     on_done(nil, rerr)
     return

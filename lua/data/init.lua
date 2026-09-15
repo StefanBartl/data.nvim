@@ -10,6 +10,12 @@ local raw_notify = require("lib.nvim.notify").create("[data]")
 local M = {}
 
 ---@internal
+--- Namespace for the extmark `M.filter` anchors its scope to across the
+--- interactive `pickers.refine` prompt -- see that function's own comment
+--- for why a plain `s0`/`e0` line pair isn't enough there.
+local FILTER_NS = vim.api.nvim_create_namespace("data.nvim/filter")
+
+---@internal
 --- `vim.notify` at ERROR level ultimately reaches `nvim_err_writeln`; called
 --- synchronously from inside a usercmd handler invoked via `vim.cmd()` (a
 --- script, a macro, a test), that surfaces as a raw "Vim:..." error from the
@@ -247,6 +253,18 @@ end
 --- loop; this only resolves scope/decode and writes the result back, same
 --- shape as `run`/`convert`, except the write happens later, from
 --- `data.filter`'s `on_done` callback, once the interactive part is over.
+---
+--- That gap is exactly why this cannot reuse `run`/`convert`'s plain
+--- `s0`/`e0` line pair unchanged: the clause-building prompt can take an
+--- arbitrary amount of time (however long a person takes to pick fields and
+--- type terms), and nothing stops the buffer from being edited elsewhere,
+--- made unmodifiable, or closed outright in that window -- a plain line
+--- pair captured before the prompt opened would then either write over the
+--- wrong lines or throw a raw "invalid buffer" error out of an async
+--- callback. An extmark tracks the scope's actual position across whatever
+--- happens meanwhile (shrinking/growing with edits inside it the same way
+--- any other extmark does), and buffer validity/`modifiable` are checked
+--- again right before the write, not just once up front.
 ---@param fmt string              # "json"|"yaml"|"xml"
 ---@param cmd Lib.UserCommand.Args
 ---@param opts? Data.RenderOpts
@@ -279,20 +297,55 @@ function M.filter(fmt, cmd, opts)
     return
   end
 
+  local mark_id = vim.api.nvim_buf_set_extmark(bufnr, FILTER_NS, s0, 0, {
+    end_row = e0 + 1,
+    end_col = 0,
+  })
+  local function del_mark()
+    if vim.api.nvim_buf_is_valid(bufnr) then
+      pcall(vim.api.nvim_buf_del_extmark, bufnr, FILTER_NS, mark_id)
+    end
+  end
+
   require("data.filter").run(formatter, value, opts, function(out, ferr)
     if ferr then
       notify.error(("%s filter: %s"):format(fmt:upper(), ferr))
+      del_mark()
       return
     end
     if not out then
       -- Cancelled before any clause was added -- nothing to do, silently.
+      del_mark()
       return
     end
     if #out == 0 then
       notify.warn(("%s filter: no entries matched -- scope left unchanged"):format(fmt:upper()))
+      del_mark()
       return
     end
-    vim.api.nvim_buf_set_lines(bufnr, s0, e0 + 1, false, out)
+
+    if not vim.api.nvim_buf_is_valid(bufnr) then
+      notify.error(
+        ("%s filter: buffer was closed before the filter finished -- discarding the result"):format(
+          fmt:upper()
+        )
+      )
+      return
+    end
+    if not vim.bo[bufnr].modifiable then
+      notify.error(
+        ("%s filter: buffer is no longer modifiable -- discarding the result"):format(fmt:upper())
+      )
+      del_mark()
+      return
+    end
+
+    local mark = vim.api.nvim_buf_get_extmark_by_id(bufnr, FILTER_NS, mark_id, { details = true })
+    local live_s0 = mark[1]
+    local live_e0 = (mark[3] and mark[3].end_row) and (mark[3].end_row - 1) or e0
+    del_mark()
+
+    vim.api.nvim_buf_set_lines(bufnr, live_s0, live_e0 + 1, false, out)
   end)
 end
 
