@@ -125,18 +125,21 @@ end
 ---@param opts Data.RenderOpts
 ---@return nil
 local function run_ndjson(formatter, fmt, bufnr, s0, e0, src, opts)
+  -- Hoisted out of the loop below -- this is the one loop in the plugin
+  -- whose iteration count scales with user input (ndjson line count), so a
+  -- per-line table-field lookup is worth avoiding here specifically.
+  local decode, render = formatter.decode, formatter.render
+
   local out, skipped = {}, 0
   for _, line in ipairs(src) do
     if line:find("%S") then
-      local value, derr = safe_call(formatter.decode, line)
+      local value, derr = safe_call(decode, line)
       local rendered, rerr
       if not derr then
-        rendered, rerr = safe_call(formatter.render, value, "pretty", opts)
+        rendered, rerr = safe_call(render, value, "pretty", opts)
       end
       if rendered and not rerr then
-        for _, rl in ipairs(rendered) do
-          out[#out + 1] = rl
-        end
+        table.move(rendered, 1, #rendered, #out + 1, out)
       else
         skipped = skipped + 1
         out[#out + 1] = line

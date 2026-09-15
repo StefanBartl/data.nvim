@@ -86,6 +86,12 @@ function M.render(value, mode, opts)
       return nil, err
     end
     local out = {}
+    if #items > 0 then
+      -- Pre-size the array part: `items`'s length is already known, so
+      -- there's no reason to let the fill loop below grow `out` by
+      -- repeated reallocation for a large flattened document.
+      out[#items] = false
+    end
     for i, item in ipairs(items) do
       out[i] = (mode == "keys") and item.path or (item.path .. ": " .. display(item.value))
     end
