@@ -2,22 +2,35 @@
 ---@module 'data.@types'
 
 ---@class DataJsonConfig
----@field indent integer # Default indent width for `pretty`/`sort` (default 2).
----@field sep string     # Default path separator for `lines`/`keys` (default ".").
+--- Default indent width for `pretty`/`sort` (default 2).
+---@field indent integer
+--- Default path separator for `lines`/`keys` (default ".").
+---@field sep string
 
 ---@class DataYamlConfig
----@field indent integer # Default indent width for `pretty`/`sort` (default 2).
----@field sep string     # Default path separator for `lines`/`keys` (default ".").
+--- Default indent width for `pretty`/`sort` (default 2).
+---@field indent integer
+--- Default path separator for `lines`/`keys` (default ".").
+---@field sep string
 
 ---@class DataXmlConfig
----@field indent integer # Default indent width for `pretty`/`sort` (default 2).
----@field sep string     # Default path separator for `lines`/`keys` (default ".").
+--- Default indent width for `pretty`/`sort` (default 2).
+---@field indent integer
+--- Default path separator for `lines`/`keys` (default ".").
+---@field sep string
 
 ---@class DataKeymapsConfig
----@field preset boolean # Reserved for a future default keymap preset. Always false today: data.nvim's actions are Ex commands, not motions, so there is no default preset yet.
+--- Reserved for a future default keymap preset. Always false today:
+--- data.nvim's actions are Ex commands, not motions, so there is no
+--- default preset yet.
+---@field preset boolean
 
 ---@class DataFencedScopeConfig
----@field enable boolean # Default true. When the cursor sits inside a matching ```json/```yaml/```xml fenced block and color_my_ascii is installed, act on the block instead of the whole buffer (see data.scope.resolve). A no-op either way when color_my_ascii isn't installed.
+--- Default true. When the cursor sits inside a matching ```json/```yaml/```xml
+--- fenced block and color_my_ascii is installed, act on the block instead of
+--- the whole buffer (see data.scope.resolve). A no-op either way when
+--- color_my_ascii isn't installed.
+---@field enable boolean
 
 ---@class DataConfig
 ---@field json DataJsonConfig

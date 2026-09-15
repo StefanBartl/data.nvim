@@ -87,4 +87,13 @@ function M.get(path)
   return v
 end
 
+--- A deep-copied snapshot of the whole resolved config, for the rare caller
+--- that needs the entire table rather than one dot-path (`data.bindings`
+--- threading `cfg` into `keymaps.setup`/`autocmds.setup`) -- see `M.get`'s
+--- own doc comment for why this is a copy, not `M.options` itself.
+---@return DataConfig
+function M.get_all()
+  return vim.deepcopy(M.options)
+end
+
 return M

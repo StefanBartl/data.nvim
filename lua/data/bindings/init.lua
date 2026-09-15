@@ -7,7 +7,7 @@ local M = {}
 ---@return nil
 function M.setup()
   require("data.bindings.usrcmds").setup()
-  local cfg = require("data.config").options
+  local cfg = require("data.config").get_all()
   require("data.bindings.keymaps").setup(cfg)
   require("data.bindings.autocmds").setup(cfg)
 end
