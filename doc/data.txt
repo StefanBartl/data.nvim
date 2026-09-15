@@ -1,0 +1,104 @@
+*data.txt*                          Format and filter JSON/YAML/XML in Neovim
+                                                                    *data.nvim*
+
+==============================================================================
+CONTENTS                                                        *data-contents*
+
+  1. Introduction ............................. |data-introduction|
+  2. Setup .................................... |data-setup|
+  3. Commands .................................. |data-commands|
+  4. Configuration ............................ |data-config|
+  5. Scope ..................................... |data-scope|
+  6. Health .................................... |data-health|
+  7. lib.nvim integration ...................... |data-lib|
+
+==============================================================================
+1. INTRODUCTION                                             *data-introduction*
+
+data.nvim reformats structured data (JSON today; YAML/XML planned) in place,
+either the whole buffer or a Visual selection: pretty-print, collapse to one
+line, or flatten nested keys onto one `path: value` line each.
+
+Requires Neovim 0.9+ and `lib.nvim` (hard dependency).
+
+==============================================================================
+2. SETUP                                                          *data-setup*
+
+                                                                *data.setup()*
+>lua
+    require("data").setup({
+      json = { indent = 2, sep = "." },
+    })
+<
+Calling setup() merges your options over the defaults and defines the
+`:JSON` user command. setup() is safe to call once.
+
+==============================================================================
+3. COMMANDS                                                    *data-commands*
+
+                                                                       *:JSON*
+:[range]JSON [action] [args] [flags]
+
+Range-aware: no range acts on the whole buffer, a Visual selection or an
+explicit `:N,M` range acts only on those lines.
+
+    :JSON                       same as :JSON pretty
+    :JSON pretty [indent]       pretty-print (default 2-space indent)
+    :JSON compact                collapse onto one line
+    :JSON lines [--sep=X]        one "path: value" per leaf, dotted keys
+    :JSON keys [--sep=X]         only the (dotted) key paths, no values
+    :JSON sort [indent]          pretty-print with sorted object keys
+
+`sort` and `pretty` are currently identical output: `vim.json.decode` does
+not preserve the source's original key order, and the underlying encoder
+sorts keys by default. See |data-lib| and `data.format.json`'s doc comment.
+
+Malformed input in the resolved scope leaves the buffer untouched and
+reports an error notification instead of partially overwriting anything.
+
+Full cheatsheet (including `<Tab>` completion behavior): docs/BINDINGS.md.
+
+==============================================================================
+4. CONFIGURATION                                                  *data-config*
+
+>lua
+    require("data").setup({
+      json = {
+        indent = 2,   -- default indent for :JSON pretty/sort
+        sep = ".",    -- default path separator for :JSON lines/keys
+      },
+      keymaps = {
+        preset = false, -- reserved; no default keymap preset exists yet
+      },
+    })
+<
+`indent`/`sep` are also overridable per invocation (`:JSON pretty 4`,
+`:JSON lines --sep=/`) — the config values are only the fallback.
+
+==============================================================================
+5. SCOPE                                                            *data-scope*
+
+  - No range -> the whole current buffer.
+  - A range (`:5,12JSON compact`) or a Visual selection (`'<,'>JSON lines`)
+    -> only those lines are decoded and replaced.
+  - Register scope (`--reg=`, output to a scratch split instead of the
+    buffer) and a `pickers.refine`-based `:JSON filter` are designed but not
+    implemented yet -- see docs/scope.md in the repository.
+
+==============================================================================
+6. HEALTH                                                          *data-health*
+
+`:checkhealth data` reports Neovim version, whether `lib.nvim` is installed
+(required), and whether the installed `lib.nvim` ships
+`lib.lua.tables.path_flatten` (required by `:JSON lines`/`:JSON keys`).
+
+==============================================================================
+7. LIB.NVIM INTEGRATION                                               *data-lib*
+
+data.nvim is a thin editor layer: JSON decode/encode
+(`lib.nvim.json`, `lib.lua.json.encode`) and the recursive path-flattening
+`:JSON lines`/`keys` need (`lib.lua.tables.path_flatten`) live in
+https://github.com/StefanBartl/lib.nvim, not in this plugin. The `:JSON`
+command itself is built on `lib.nvim.bindings.usercmd.composer`.
+
+ vim:tw=78:ts=8:ft=help:norl:

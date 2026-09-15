@@ -1,0 +1,76 @@
+---@diagnostic disable: need-check-nil
+-- TESTS/usrcmds_spec.lua — the :JSON command, end to end against a real buffer.
+
+describe(":JSON", function()
+  local bufnr
+
+  before_each(function()
+    -- Fresh module instances: data.bindings.usrcmds registers the :JSON
+    -- usercmd once via lib.nvim's composer registry, and re-requiring
+    -- data.init without clearing it would try to redefine the same command
+    -- every test, masking a setup() bug that only shows up on a second call.
+    for _, name in ipairs({ "data", "data.config", "data.bindings", "data.bindings.usrcmds" }) do
+      package.loaded[name] = nil
+    end
+    require("data").setup()
+
+    bufnr = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_set_current_buf(bufnr)
+  end)
+
+  after_each(function()
+    vim.api.nvim_buf_delete(bufnr, { force = true })
+  end)
+
+  it("bare :JSON pretty-prints the whole buffer", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '{"b":2,"a":1}' })
+    vim.cmd("JSON")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "{", '  "a": 1,', '  "b": 2', "}" }, lines)
+  end)
+
+  it(":JSON compact collapses onto one line", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "{", '  "a": 1', "}" })
+    vim.cmd("JSON compact")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ '{"a":1}' }, lines)
+  end)
+
+  it(":JSON pretty 4 uses a 4-space indent", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '{"a":1}' })
+    vim.cmd("JSON pretty 4")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "{", '    "a": 1', "}" }, lines)
+  end)
+
+  it("a visual-selection range only rewrites the selected lines", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
+      "before",
+      '{"a":1}',
+      "after",
+    })
+    vim.cmd("2JSON compact")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "before", '{"a":1}', "after" }, lines, "single-line range round-trips unchanged")
+  end)
+
+  it(":JSON lines flattens nested keys onto dotted-path lines", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '{"user":{"id":1},"level":"error"}' })
+    vim.cmd("JSON lines")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "level: error", "user.id: 1" }, lines)
+  end)
+
+  it("malformed JSON leaves the buffer untouched", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "{not json" })
+    vim.cmd("JSON")
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "{not json" }, lines)
+  end)
+end)
