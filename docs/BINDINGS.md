@@ -30,7 +30,7 @@ underneath; the "Flags" column names only what is specific to that action.
 | `ndjson [indent]` | yes | `indent?: INT` | — | **`:JSON` only.** Pretty-print each line as its own JSON object. |
 | `to yaml` | yes | `format: STRING` | — | **`:JSON` only.** Convert the scope to YAML. |
 | `to json` | yes | `format: STRING` | — | **`:YAML` only.** Convert the scope to JSON. |
-| `filter [--sep=X]` | yes | — | `--sep: STRING` | Interactively filter flattened path/value entries. **Requires pickers.nvim.** |
+| `filter [--sep=X]` | yes | — | `--sep: STRING`, `--preview`, `--no-preview` | Interactively filter flattened path/value entries. **Requires pickers.nvim**; `--preview` (diff the result and confirm before replacing) additionally requires diff.nvim. |
 
 ### Source / target flags (every action, every verb)
 
@@ -44,6 +44,9 @@ underneath; the "Flags" column names only what is specific to that action.
 The three target flags are mutually exclusive. `--reg --inplace` additionally
 requires an explicit range or visual selection. Full semantics:
 [commands.md](commands.md#source-and-target-flags).
+
+`--preview`/`--no-preview` are declared on `filter` only — on any other action
+they are an unknown-flag error rather than a flag that does nothing.
 
 Full action semantics: [commands.md](commands.md).
 

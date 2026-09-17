@@ -25,6 +25,10 @@ require("data").setup({
   target = {
     split = "right", -- where `--split` opens: "above"|"below"|"left"|"right"|"auto"
   },
+  preview = {
+    filter = false,   -- diff the result before an in-place `filter` replaces the scope
+    view = "inline",  -- diff.nvim view for that preview: "inline" (a split) or "float"
+  },
   keymaps = {
     preset = false, -- reserved: no default keymap preset exists yet
   },
@@ -52,6 +56,14 @@ that one was the user's own choice. See
 opens its scratch window. `"auto"` — or any value that isn't one of the four
 directions — uses a plain `:new`, honoring your own `'splitbelow'`/
 `'splitright'`.
+
+`preview.filter = true` makes every in-place `filter` show a
+[diff.nvim](https://github.com/StefanBartl/diff.nvim) before/after diff and ask
+before writing; `--preview`/`--no-preview` override it per invocation. It
+requires diff.nvim — with the preview on and diff.nvim missing, `filter` reports
+that and writes nothing, rather than quietly filtering unseen. `preview.view`
+picks `inline` (a split) or `float`; side-by-side views are not offered, and
+[integrations.md](integrations.md#diffnvim--filter---preview) says why.
 
 `keymaps.preset` is a placeholder for a future default keymap set; setting it to
 `true` today has no effect, since none is defined (see

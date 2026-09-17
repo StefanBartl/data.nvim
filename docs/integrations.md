@@ -50,3 +50,37 @@ Without `pickers.nvim` installed, every other `data.nvim` command still works
 exactly as documented; only `filter` fails, with a clear notification rather
 than silently doing nothing. `:checkhealth data` reports whether
 `pickers.refine` was found. See [commands.md](commands.md) for the prompt flow.
+
+## diff.nvim — `filter --preview`
+
+**Optional.** [`diff.nvim`](https://github.com/StefanBartl/diff.nvim) renders
+the before/after diff behind `filter --preview`: instead of replacing the
+scope outright, the result is shown as a unified diff against what is there
+now, and written only if you say so.
+
+```vim
+:JSON filter --preview
+```
+
+Build the clause stack as usual; when it commits, a diff opens showing exactly
+which lines the filter would remove, and a prompt asks `Apply` / `Discard`.
+`preview.filter = true` in [`setup()`](configuration.md) makes that the default
+for every in-place `filter`, and `--no-preview` opts a single run back out.
+
+**Required once asked for.** `--preview` with diff.nvim missing is an error and
+**nothing is written** — a preview that silently skips the preview would defeat
+the one thing the flag exists for. Plain `filter` (and every other action) works
+without diff.nvim as before; `:checkhealth data` reports whether it was found.
+
+Only `filter` offers it, and only for an in-place result. `--split`/`--out-reg`
+leave the original scope exactly where it is, so the "before" is still on screen
+afterwards and there is nothing to preview against — `--preview` alongside one
+of those says so rather than doing nothing quietly.
+
+data.nvim calls diff.nvim's public `require("diff").run("key=value …")` API with
+the two sides as buffer specifiers and `view=inline`. Side-by-side views
+(`vsplit`/`split`/`tab`) are deliberately **not** offered: diff.nvim's
+side-by-side renderer materializes only the *target* and pairs it with whatever
+buffer the origin window is showing, so the left-hand side would be the whole
+data buffer rather than the resolved scope — wrong for a fenced-block or Visual
+scope. `preview.view` picks between `inline` (a split) and `float`.

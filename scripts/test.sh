@@ -22,7 +22,17 @@ command -v nvim >/dev/null 2>&1 || {
 target="${1:-TESTS/}"
 
 if [[ "$target" == *.lua ]]; then
-  cmd="PlenaryBustedFile $target"
+  # Deliberately NOT :PlenaryBustedFile. That maps to plenary's
+  # `test_harness.test_file`, which takes no options and therefore spawns its
+  # child nvim with no `-u` at all -- the child then has only the cwd and
+  # plenary on its 'runtimepath', so every optional soft dependency
+  # (color_my_ascii, pickers.nvim, diff.nvim) looks absent and every spec
+  # gated on one silently registers zero tests. A single-file run reported
+  # "Success" while quietly skipping exactly the tests it was invoked for.
+  # `plenary.busted.run` is what that child would have called anyway; running
+  # it in THIS process keeps the `-u scripts/minimal_init.lua` below, which is
+  # where those dependencies come from.
+  cmd="lua require('plenary.busted').run('$target')"
 else
   cmd="PlenaryBustedDirectory $target { minimal_init = 'scripts/minimal_init.lua', sequential = true }"
 fi

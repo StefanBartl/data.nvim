@@ -7,9 +7,9 @@
 --- format), `lib.lua.yaml.encode` (`:YAML`), and `lib.lua.xml` (`:XML`) --
 --- each only present from the version data.nvim shipped alongside the
 --- feature that needs it. Also reports, purely informationally (never an
---- error -- both are optional), whether `color_my_ascii` (fenced-block
---- scope) and `pickers.nvim` (`:filter`) are present. Read-only: never
---- mutates state.
+--- error -- all three are optional), whether `color_my_ascii` (fenced-block
+--- scope), `pickers.nvim` (`:filter`) and `diff.nvim` (`:filter --preview`)
+--- are present. Read-only: never mutates state.
 
 local M = {}
 
@@ -96,6 +96,14 @@ function M.check()
   else
     info(
       "pickers.nvim not found (optional) -- :JSON/:YAML/:XML filter is unavailable; every other action still works"
+    )
+  end
+
+  if require("data.preview").available() then
+    ok("diff.nvim detected -- :filter --preview (before/after diff) available")
+  else
+    info(
+      "diff.nvim not found (optional) -- :filter --preview is unavailable; filter itself works without it"
     )
   end
 end

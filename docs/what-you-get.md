@@ -27,6 +27,9 @@ Calling `require("data").setup()` with no arguments (or `opts = {}` under lazy.n
 - `filter` (on any of the four commands) needs
   [pickers.nvim](https://github.com/StefanBartl/pickers.nvim) installed —
   every other action works regardless. See [integrations.md](integrations.md).
+- `filter --preview` diffs the result against the scope and asks before
+  replacing it; it needs [diff.nvim](https://github.com/StefanBartl/diff.nvim).
+  Off by default (`preview.filter`), and only `filter` offers it.
 - Every action takes `--reg`/`--reg=<name>` to read from a register instead of
   the buffer, and `--inplace`/`--split`/`--out-reg=<name>` to say where the
   result goes. The defaults need no flags at all: a buffer or selection scope

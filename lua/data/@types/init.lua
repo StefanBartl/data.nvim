@@ -34,6 +34,16 @@
 --- "right" -- a vertical split, as the concept described it.
 ---@field split string
 
+---@class DataPreviewConfig
+--- Show a diff.nvim before/after preview before an in-place `:JSON filter`/
+--- `:YAML filter`/`:XML filter`/`:Data filter` replaces its scope, and ask
+--- whether to apply it. Default false; `--preview`/`--no-preview` override
+--- it per invocation. Requires diff.nvim (see data.preview).
+---@field filter boolean
+--- diff.nvim `view=` for that preview: "inline" (a split) or "float".
+--- Side-by-side views are deliberately not offered -- see data.preview.
+---@field view string
+
 ---@class DataKeymapsConfig
 --- Reserved for a future default keymap preset. Always false today:
 --- data.nvim's actions are Ex commands, not motions, so there is no
@@ -54,6 +64,7 @@
 ---@field fenced_scope DataFencedScopeConfig
 ---@field register DataRegisterConfig
 ---@field target DataTargetConfig
+---@field preview DataPreviewConfig
 ---@field keymaps DataKeymapsConfig
 
 ---@alias Data.RenderMode "pretty"|"compact"|"lines"|"keys"|"sort"|"ndjson"
@@ -77,6 +88,8 @@
 ---@field inplace? boolean         # --inplace: replace the buffer scope (default for a buffer/selection source)
 ---@field split? boolean           # --split: open the result in a scratch split (default for a register source)
 ---@field out_reg? string|boolean  # --out-reg / --out-reg=<name>: write the result into a register
+---@field preview? boolean         # --preview: diff the result against the scope and ask before an in-place write (`filter` only)
+---@field no_preview? boolean      # --no-preview: skip that, overriding a `preview.filter = true` config
 
 --- A failure one of the scope modules reports back to its caller instead of
 --- notifying directly -- see `data.scope.source`'s doc comment.
@@ -98,6 +111,15 @@
 ---@class Data.Sink
 ---@field kind "inplace"|"split"|"register"
 ---@field reg? string     # kind == "register": which register to write
+
+--- One before/after preview, as `data.preview.confirm` takes it.
+---@class Data.PreviewOpts
+---@field before string[]      # the scope as it stands now
+---@field after string[]       # what the action would replace it with
+---@field label string         # short action name for the holder buffers, e.g. "json filter"
+---@field before_label string  # left-hand header line of the rendered diff
+---@field after_label string   # right-hand header line
+---@field prompt string        # the `vim.ui.select` prompt
 
 ---@class Data.SinkWriteOpts
 ---@field filetype? string # 'filetype' for a `--split` scratch buffer; nil when the output isn't in the source format (`lines`/`keys`/`filter`)

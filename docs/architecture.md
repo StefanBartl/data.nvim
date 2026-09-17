@@ -131,6 +131,30 @@ contents. It is refused with a message saying so rather than being either
 silently allowed or silently ignored. With an explicit range or Visual
 selection it is exactly what it looks like, and is allowed.
 
+### The preview is a `filter` flag, not a delivery option
+
+`--preview` hangs off `filter` alone, and there are two independent reasons,
+either of which would be enough. `filter` is the only action that *loses*
+information — `pretty`/`compact`/`sort`/`to`/`ndjson` all render the same
+document a different way, and the worst a mistaken one costs is an undo. And
+`filter` is already built to survive an arbitrarily long gap between resolving
+a scope and writing it (the extmark below); a confirmation prompt is a second
+such gap, and putting one on the synchronous actions would mean giving each of
+them that machinery for a case none of them needs.
+
+Because the flag is declared only on `filter`'s routes, `:JSON pretty --preview`
+is an unknown-flag error from the composer rather than a flag that silently does
+nothing — the composer's fail-loud stance on undeclared flags doing the work a
+runtime check would otherwise have to.
+
+The preview goes through diff.nvim's public `require("diff").run("key=value …")`
+API with both sides as buffer specifiers, and uses `view=inline`/`float` only:
+diff.nvim's side-by-side renderer materializes the *target* and pairs it with
+whatever buffer the origin window shows, so the left-hand side would be the
+whole data buffer instead of the resolved scope — fine for a whole-buffer
+scope, wrong for a fenced-block or Visual one. The unified-diff views build
+from both resolved sides and are correct for all of them.
+
 ### `filter` only pays for the extmark when it needs to
 
 `filter`'s in-place path anchors its scope to an extmark across the interactive
@@ -138,6 +162,13 @@ prompt, because the buffer can change arbitrarily while a person builds a
 clause stack. A `--split`/`--out-reg` target writes somewhere that did not
 exist yet when the prompt opened, so it needs none of that — the extmark is
 only created for an in-place target.
+
+`--preview` adds a second gap of the same kind, so the extmark stays alive
+until after the `Apply`/`Discard` decision, and the live span is re-read from
+it on both sides of the preview: once to build the "before" the diff actually
+shows, and once more before the write. Reusing the first read for the second
+would mean previewing one span and writing another whenever the buffer changed
+while the diff was on screen.
 
 ## `:Data` reuses the fenced-block lookup it's already paying for
 

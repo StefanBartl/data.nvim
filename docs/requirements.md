@@ -17,3 +17,6 @@ optional soft dependency for fenced-block scope
 [`pickers.nvim`](https://github.com/StefanBartl/pickers.nvim) is an optional
 dependency required for exactly one action, `:JSON`/`:YAML`/`:XML filter`
 ([integrations.md](integrations.md)) — every other command works without it.
+[`diff.nvim`](https://github.com/StefanBartl/diff.nvim) is optional in the same
+way, for exactly one flag: `filter --preview`
+([integrations.md](integrations.md)) — plain `filter` works without it.

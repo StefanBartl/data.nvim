@@ -58,14 +58,29 @@ local IO_FLAGS = {
 }
 
 ---@internal
+--- Preview flags, offered on `filter` and nowhere else. `filter` is the one
+--- action that loses data, and the one already built to survive an async gap
+--- between resolving a scope and writing it -- see `data.preview`'s own doc
+--- comment for both halves of that. Declaring them only here means
+--- `:JSON pretty --preview` is a "unknown flag" error rather than a flag
+--- that quietly does nothing.
+---@type Lib.UserCmd.Composer.FlagSpec[]
+local PREVIEW_FLAGS = {
+  { name = "preview", bool = true },
+  { name = "no-preview", bool = true },
+}
+
+---@internal
 --- `extra` plus the shared IO flags, as a fresh list -- the spec tables
 --- above are shared across every route of every verb, so appending to one
 --- in place would leak into all of them.
----@param extra? Lib.UserCmd.Composer.FlagSpec[]
+---@param ... Lib.UserCmd.Composer.FlagSpec[]
 ---@return Lib.UserCmd.Composer.FlagSpec[]
-local function with_io(extra)
+local function with_io(...)
   local out = {}
-  vim.list_extend(out, extra or {})
+  for _, list in ipairs({ ... }) do
+    vim.list_extend(out, list)
+  end
   vim.list_extend(out, IO_FLAGS)
   return out
 end
@@ -80,6 +95,8 @@ local function io_flags(ctx)
     inplace = ctx.flags.inplace,
     split = ctx.flags.split,
     out_reg = ctx.flags["out-reg"],
+    preview = ctx.flags.preview,
+    no_preview = ctx.flags["no-preview"],
   }
 end
 
@@ -149,8 +166,8 @@ local function make_routes(fmt, include_compact, include_ndjson, to_format)
   routes[#routes + 1] = {
     path = { "filter" },
     range = true,
-    flags = with_io(SEP_FLAG),
-    desc = "Interactively filter flattened path/value entries (requires pickers.nvim)",
+    flags = with_io(SEP_FLAG, PREVIEW_FLAGS),
+    desc = "Interactively filter flattened path/value entries (requires pickers.nvim; --preview to diff before replacing)",
     run = function(ctx)
       data.filter(fmt, ctx.raw, { sep = ctx.flags.sep }, io_flags(ctx))
     end,
@@ -258,8 +275,8 @@ local function make_data_routes()
     {
       path = { "filter" },
       range = true,
-      flags = with_io(SEP_FLAG),
-      desc = "Interactively filter flattened path/value entries, format auto-detected (requires pickers.nvim)",
+      flags = with_io(SEP_FLAG, PREVIEW_FLAGS),
+      desc = "Interactively filter flattened path/value entries, format auto-detected (requires pickers.nvim; --preview to diff before replacing)",
       run = function(ctx)
         data.run_auto("filter", ctx.raw, { sep = ctx.flags.sep }, io_flags(ctx))
       end,

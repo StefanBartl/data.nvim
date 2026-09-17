@@ -11,10 +11,18 @@ LIB_NVIM_DIR=/path/to/lib.nvim scripts/test.sh
 `.deps/plenary.nvim`, or `../plenary.nvim`) — see that file for the exact search
 order. `scripts/test.sh path/to_spec.lua` runs a single spec file.
 
-`COLOR_MY_ASCII_DIR` (or a sibling `../color_my_ascii.nvim`/`.deps/color_my_ascii.nvim`)
-is looked up the same way but is optional: the fenced-scope specs in
-`scope_resolve_spec.lua` skip themselves when it isn't found, rather than failing
-the run — see [integrations.md](integrations.md).
+`COLOR_MY_ASCII_DIR`, `PICKERS_DIR` and `DIFF_DIR` (or a sibling
+`../color_my_ascii.nvim`/`../pickers.nvim`/`../diff.nvim`, or a `.deps/` clone)
+are looked up the same way but are optional: the specs that need one skip
+themselves when it isn't found, rather than failing the run — the fenced-scope
+specs in `scope_resolve_spec.lua`, the `filter` specs in `filter_spec.lua`, and
+the preview specs in `preview_spec.lua`. See
+[integrations.md](integrations.md).
+
+**A skipped spec still reports "Success".** Plenary has no "skipped" outcome,
+so a describe that registers zero tests is invisible in the output — if you are
+working on one of those integrations, check that its `it`s actually appear in
+the run rather than trusting the green line at the bottom.
 
 ## Style
 

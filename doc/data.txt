@@ -59,6 +59,23 @@ explicit `:N,M` range acts only on those lines.
     to json                        :YAML only: convert the scope to JSON
     filter [--sep=X]                interactively filter path/value entries (needs pickers.nvim)
 
+                                                        *data-preview* *:JSON-filter---preview*
+`filter` takes two more flags of its own:
+
+    --preview                      show the result as a before/after diff and
+                                    ask before replacing the scope
+    --no-preview                   skip that, overriding `preview.filter = true`
+
+Backed by diff.nvim (optional). `--preview` is a `filter` flag only -- on any
+other action it is an unknown-flag error rather than a flag that does nothing:
+`filter` is the one action that loses information, and the one already built
+to survive an arbitrarily long gap between resolving a scope and writing it.
+
+Asked for with diff.nvim missing, NOTHING is written -- a preview that
+silently skips the preview would defeat the point of the flag. It applies to
+an in-place result only; `--split`/`--out-reg` leave the scope where it is, so
+there is nothing to preview against, and combining them warns.
+
                                             *data-flags* *:JSON---reg* *:JSON---split*
 Every action of every verb additionally accepts four source/target flags:
 
@@ -128,6 +145,10 @@ Full cheatsheet (including `<Tab>` completion behavior): docs/BINDINGS.md.
       target = {
         split = "right", -- where --split opens: above|below|left|right|auto
       },
+      preview = {
+        filter = false,  -- diff before an in-place `filter` replaces the scope
+        view = "inline", -- diff.nvim view for it: "inline" or "float"
+      },
       keymaps = {
         preset = false, -- reserved; no default keymap preset exists yet
       },
@@ -142,7 +163,9 @@ falls back to `"` and says so, while an explicitly typed `--reg=+` is left
 alone and fails with the ordinary "register is empty" message instead.
 `target.split` picks the direction `--split` opens in; "auto" (or anything
 that is not one of the four directions) honors your own 'splitbelow'/
-'splitright'.
+'splitright'. `preview.filter` makes |data-preview| the default for every
+in-place `filter`; `preview.view` picks "inline" (a split) or "float" --
+side-by-side views are deliberately not offered, see docs/integrations.md.
 
 ==============================================================================
 5. SCOPE                                                            *data-scope*
@@ -167,7 +190,9 @@ matches the source. See |data-flags|.
 (required), and whether it ships `lib.lua.tables.path_flatten` (required by
 `lines`/`keys`), `lib.lua.yaml.encode` (required by `:YAML`),
 `lib.lua.xml` (required by `:XML`), and `lib.nvim.window.open_scratch_split`
-(required by `--split`).
+(required by `--split`). It also reports, informationally only, whether the
+three optional plugins are present: color_my_ascii (fenced-block scope),
+pickers.nvim (`filter`) and diff.nvim (`filter --preview`).
 
 ==============================================================================
 7. LIB.NVIM INTEGRATION                                               *data-lib*
@@ -194,5 +219,11 @@ pickers.nvim (optional, required for `filter` specifically): backs
 `:JSON`/`:YAML`/`:XML filter` via `pickers.refine`. Every other command works
 without it; `filter` fails with a clear notification instead. See
 docs/integrations.md.
+
+diff.nvim (optional, required for `filter --preview` specifically): renders
+the before/after diff |data-preview| shows before an in-place `filter`
+replaces the scope, via diff.nvim's public `require("diff").run()` API. Plain
+`filter` and every other command work without it; `--preview` with diff.nvim
+missing writes nothing and says so. See docs/integrations.md.
 
  vim:tw=78:ts=8:ft=help:norl:

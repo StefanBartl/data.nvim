@@ -27,6 +27,10 @@ local DEFAULTS = {
   target = {
     split = "right",
   },
+  preview = {
+    filter = false,
+    view = "inline",
+  },
   keymaps = {
     preset = false,
   },

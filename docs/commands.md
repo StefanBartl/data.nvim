@@ -16,7 +16,7 @@ so every action and flag below also has `<Tab>` completion.
 | `ndjson [indent]` | **`:JSON` only.** Pretty-print each line as its own JSON object, not the scope as one document. A line that fails to decode is left unchanged; the total skipped count is reported once. |
 | `to yaml` | **`:JSON` only.** Convert the scope to YAML, in place. |
 | `to json` | **`:YAML` only.** Convert the scope to JSON, in place. |
-| `filter [--sep=X]` | Interactively reduce the flattened `path`/`value` entries down to the ones matching a clause stack, replacing the scope with the survivors' `lines`-style text. **Requires [pickers.nvim](https://github.com/StefanBartl/pickers.nvim).** |
+| `filter [--sep=X] [--preview]` | Interactively reduce the flattened `path`/`value` entries down to the ones matching a clause stack, replacing the scope with the survivors' `lines`-style text. **Requires [pickers.nvim](https://github.com/StefanBartl/pickers.nvim);** `--preview` additionally requires [diff.nvim](https://github.com/StefanBartl/diff.nvim). |
 
 Every action also takes the source/target flags below.
 
@@ -31,6 +31,8 @@ action of every verb, in any order, alongside that action's own args/flags.
 | `--inplace` | Write the result back over the buffer scope. |
 | `--split` | Write the result into a fresh scratch split (`target.split` picks the direction). |
 | `--out-reg` / `--out-reg=<name>` | Write the result into a register. Bare `--out-reg` uses `register.default`. |
+
+(`filter` takes two more of its own, `--preview`/`--no-preview` — see below.)
 
 **Defaults follow the source.** A buffer or selection scope replaces itself
 (`--inplace`); a register source opens a split (`--split`), because the point
@@ -95,6 +97,33 @@ a value too, not just a path. A filter matching nothing also leaves the scope
 untouched, with a warning. `pickers.nvim` not installed is the one way any
 `data.nvim` command fails outright rather than degrading — see
 [integrations.md](integrations.md).
+
+**`filter --preview`:** show the result as a unified diff against the scope as
+it stands, and write it only after an `Apply`/`Discard` prompt — so a filter
+that removes more than you meant can be thrown away before it lands. Backed by
+[diff.nvim](https://github.com/StefanBartl/diff.nvim); see
+[integrations.md](integrations.md#diffnvim--filter---preview).
+
+```vim
+:JSON filter --preview     " diff the result, then decide
+:JSON filter --no-preview  " skip it, even with preview.filter = true configured
+```
+
+`preview.filter = true` in [configuration.md](configuration.md) makes the
+preview the default for every in-place `filter`; `--preview`/`--no-preview`
+override it per invocation, and giving both is an error rather than a ranking.
+Three more things it deliberately does:
+
+- **Asked for and unavailable means nothing is written.** `--preview` without
+  diff.nvim installed is an error, not a silent plain filter — the flag exists
+  precisely so that nothing is replaced unseen.
+- **`--preview` is a `filter` flag only,** so `:JSON pretty --preview` is an
+  unknown-flag error rather than a flag that quietly does nothing. `filter` is
+  the one action that *loses* data; the rest render the same document a
+  different way, and the worst a bad one costs is an undo.
+- **It applies to an in-place result only.** `--split`/`--out-reg` leave the
+  scope where it is, so there is nothing to preview against; combining them
+  warns rather than pretending.
 
 **Why no `to xml`/`from xml`:** XML's decoded shape is a raw element tree
 (`{tag, attrs, children}`), not a plain map/array like JSON/YAML — converting

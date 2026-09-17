@@ -190,6 +190,26 @@ local function deliver(sink, source, lines, fmt, mode, prefix)
 end
 
 ---@internal
+--- Whether this invocation should preview before writing. `--preview` and
+--- `--no-preview` win over the configured default, in that order of
+--- explicitness; giving both is a contradiction rather than a ranking.
+---@param flags Data.IOFlags
+---@return boolean|nil wanted
+---@return Data.Problem|nil problem
+local function preview_wanted(flags)
+  if flags.preview and flags.no_preview then
+    return nil, { msg = "--preview / --no-preview are mutually exclusive", level = "error" }
+  end
+  if flags.no_preview then
+    return false, nil
+  end
+  if flags.preview then
+    return true, nil
+  end
+  return config.get("preview.filter") == true, nil
+end
+
+---@internal
 --- `:JSON ndjson`: treat each non-blank line of the input as its own JSON
 --- object (rather than the whole input as one document) and pretty-print
 --- it. A line that fails to decode is left completely unchanged -- one bad
@@ -381,6 +401,12 @@ end
 --- checked again right before the write (in `data.scope.sink`), not just
 --- once up front. A `--split`/`--out-reg` target needs none of that: it
 --- writes somewhere that did not exist yet when the prompt opened.
+---
+--- `--preview` (or `preview.filter = true`) adds a second such gap: the
+--- result is shown as a diff.nvim before/after diff and only written once
+--- the user says so -- see `data.preview`. The extmark therefore stays alive
+--- until after that decision, and the live span is re-read from it on both
+--- sides of the preview.
 ---@param fmt string              # "json"|"yaml"|"xml"
 ---@param cmd Lib.UserCommand.Args
 ---@param opts? Data.RenderOpts
@@ -409,6 +435,18 @@ function M.filter(fmt, cmd, opts, flags)
   end
 
   local prefix = ("%s filter: "):format(fmt:upper())
+
+  local preview, pproblem = preview_wanted(flags or {})
+  if preview == nil then
+    report(pproblem, prefix)
+    return
+  end
+  if preview and sink.kind ~= "inplace" then
+    -- Nothing to preview against: `--split`/`--out-reg` leave the scope
+    -- exactly where it is, so the "before" is still on screen afterwards.
+    notify.warn(prefix .. "--preview only applies to an in-place result -- ignored")
+    preview = false
+  end
 
   local mark_id, del_mark
   if sink.kind == "inplace" then
@@ -442,6 +480,11 @@ function M.filter(fmt, cmd, opts, flags)
       return
     end
 
+    -- Re-read the live scope BEFORE anything else: the extmark has been
+    -- tracking it across the whole clause-building prompt, and both the write
+    -- span and the preview's "before" side have to come from where the scope
+    -- actually is now, not from where it was when the command was typed.
+    local before = source.lines
     if mark_id then
       if not vim.api.nvim_buf_is_valid(bufnr) then
         notify.error(
@@ -452,10 +495,54 @@ function M.filter(fmt, cmd, opts, flags)
       local mark = vim.api.nvim_buf_get_extmark_by_id(bufnr, FILTER_NS, mark_id, { details = true })
       source.s0 = mark[1]
       source.e0 = (mark[3] and mark[3].end_row) and (mark[3].end_row - 1) or source.e0
-      del_mark()
+      before = vim.api.nvim_buf_get_lines(bufnr, source.s0, (source.e0 or 0) + 1, false)
     end
 
-    deliver(sink, source, out, fmt, "filter", prefix)
+    if not preview or vim.deep_equal(before, out) then
+      -- Identical sides have nothing to show and nothing to decide: diff.nvim
+      -- would report "No differences found" and open no window, leaving a
+      -- prompt with no preview behind it.
+      del_mark()
+      deliver(sink, source, out, fmt, "filter", prefix)
+      return
+    end
+
+    require("data.preview").confirm({
+      before = before,
+      after = out,
+      label = ("%s filter"):format(fmt),
+      before_label = ("before -- %d line(s) in scope"):format(#before),
+      after_label = ("after -- %d line(s) kept"):format(#out),
+      prompt = ("%s filter: replace %d line(s) with %d?"):format(fmt:upper(), #before, #out),
+    }, function(apply, problem)
+      if problem then
+        report(problem, prefix)
+        del_mark()
+        return
+      end
+      if not apply then
+        notify.info(prefix .. "discarded -- scope left unchanged")
+        del_mark()
+        return
+      end
+
+      -- The prompt is another arbitrarily long gap, so the span is re-read
+      -- from the extmark once more rather than trusting the one taken before
+      -- the preview opened.
+      if mark_id then
+        if not vim.api.nvim_buf_is_valid(bufnr) then
+          notify.error(prefix .. "buffer was closed during the preview -- discarding the result")
+          return
+        end
+        local mark =
+          vim.api.nvim_buf_get_extmark_by_id(bufnr, FILTER_NS, mark_id, { details = true })
+        source.s0 = mark[1]
+        source.e0 = (mark[3] and mark[3].end_row) and (mark[3].end_row - 1) or source.e0
+      end
+      del_mark()
+
+      deliver(sink, source, out, fmt, "filter", prefix)
+    end)
   end)
 end
 

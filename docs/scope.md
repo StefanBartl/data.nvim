@@ -44,6 +44,11 @@
 - Choose where any result goes, per invocation: `--inplace` (the default for a
   buffer/selection scope), `--split`, or `--out-reg=<name>` (write it back into
   a register). See [commands.md](commands.md#source-and-target-flags).
+- `filter --preview` — show the filter result as a before/after diff and write
+  it only after an `Apply`/`Discard` prompt, so a filter that removed more than
+  you meant can be thrown away before it lands. Requires
+  [diff.nvim](https://github.com/StefanBartl/diff.nvim) — see
+  [integrations.md](integrations.md); plain `filter` works without it.
 - Leave the buffer untouched on invalid input, with a clear error notification.
 
 ## Does not (yet)
@@ -78,11 +83,12 @@ framework; its `refine` filter-stack module backs `:JSON filter`/`:YAML filter`/
 `:XML filter` (see "Does" above and [integrations.md](integrations.md)) — the one
 action in this plugin that does not work without it.
 
-**[`diff.nvim`](https://github.com/StefanBartl/diff.nvim)** before/after preview of
-a filter result is a natural next step now that `filter` exists, but is not built.
-`--split` covers part of the same need in a cruder way — `:JSON filter --split`
-leaves the original scope untouched and puts the survivors beside it, so the two
-can be compared by eye without a diff.
+**[`diff.nvim`](https://github.com/StefanBartl/diff.nvim)** renders the
+before/after diff behind `filter --preview` (see "Does" above and
+[integrations.md](integrations.md)). Optional: only that one flag needs it, and
+asking for it without diff.nvim installed writes nothing rather than filtering
+unseen. `:JSON filter --split` remains the zero-dependency version of the same
+idea — the original scope stays put and the survivors land beside it.
 
 **[`ai.nvim`](https://github.com/StefanBartl/ai.nvim)** optionally consumes this
 plugin, never the other way around: its `context.structured_data` flag (see

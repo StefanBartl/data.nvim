@@ -93,3 +93,9 @@ add_optional_dep("COLOR_MY_ASCII_DIR", "color_my_ascii.nvim", "color_my_ascii")
 --- the run -- specs that need it check `pcall(require, "pickers.refine")`
 --- themselves and skip if it's missing.
 add_optional_dep("PICKERS_DIR", "pickers.nvim", "pickers.refine")
+
+--- diff.nvim, same deal again: the OPTIONAL dependency behind
+--- `:JSON filter --preview`'s before/after diff (see data.preview and
+--- docs/integrations.md). Specs that need it skip themselves when it's
+--- absent.
+add_optional_dep("DIFF_DIR", "diff.nvim", "diff")
