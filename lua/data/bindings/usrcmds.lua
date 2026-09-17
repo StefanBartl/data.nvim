@@ -39,6 +39,51 @@ local INDENT_ARG = { { name = "indent", type = "INT", optional = true } }
 local SEP_FLAG = { { name = "sep", type = "STRING" } }
 
 ---@internal
+--- Source/target flags, offered on every route of every verb: where the
+--- input comes from (`--reg`) and where the result goes (`--inplace`,
+--- `--split`, `--out-reg`). See `data.scope.source`/`data.scope.sink` --
+--- including why the register *target* is `--out-reg` and not `--reg`,
+--- which the concept used for both.
+---
+--- `--reg`/`--out-reg` are `optional_value` rather than plain value flags:
+--- the bare form means "the configured default register", and that flavor
+--- never consumes the next token, so `:JSON pretty 4 --reg` still binds `4`
+--- as the indent.
+---@type Lib.UserCmd.Composer.FlagSpec[]
+local IO_FLAGS = {
+  { name = "reg", type = "STRING", optional_value = true },
+  { name = "inplace", bool = true },
+  { name = "split", bool = true },
+  { name = "out-reg", type = "STRING", optional_value = true },
+}
+
+---@internal
+--- `extra` plus the shared IO flags, as a fresh list -- the spec tables
+--- above are shared across every route of every verb, so appending to one
+--- in place would leak into all of them.
+---@param extra? Lib.UserCmd.Composer.FlagSpec[]
+---@return Lib.UserCmd.Composer.FlagSpec[]
+local function with_io(extra)
+  local out = {}
+  vim.list_extend(out, extra or {})
+  vim.list_extend(out, IO_FLAGS)
+  return out
+end
+
+---@internal
+--- Read the source/target flags off a dispatched route's context.
+---@param ctx Lib.UserCmd.Composer.Ctx
+---@return Data.IOFlags
+local function io_flags(ctx)
+  return {
+    reg = ctx.flags.reg,
+    inplace = ctx.flags.inplace,
+    split = ctx.flags.split,
+    out_reg = ctx.flags["out-reg"],
+  }
+end
+
+---@internal
 --- Build the route table for one format verb.
 ---@param fmt string # "json"|"yaml"|"xml", passed straight through to `data.run`
 ---@param include_compact boolean # see the module doc comment
@@ -53,9 +98,10 @@ local function make_routes(fmt, include_compact, include_ndjson, to_format)
       path = { "pretty" },
       range = true,
       args = INDENT_ARG,
+      flags = with_io(),
       desc = "Pretty-print (default 2-space indent; pretty 4 for 4)",
       run = function(ctx)
-        data.run(fmt, "pretty", ctx.raw, { indent = ctx.args.indent })
+        data.run(fmt, "pretty", ctx.raw, { indent = ctx.args.indent }, io_flags(ctx))
       end,
     },
   }
@@ -64,9 +110,10 @@ local function make_routes(fmt, include_compact, include_ndjson, to_format)
     routes[#routes + 1] = {
       path = { "compact" },
       range = true,
+      flags = with_io(),
       desc = "Collapse onto one line",
       run = function(ctx)
-        data.run(fmt, "compact", ctx.raw, {})
+        data.run(fmt, "compact", ctx.raw, {}, io_flags(ctx))
       end,
     }
   end
@@ -74,37 +121,38 @@ local function make_routes(fmt, include_compact, include_ndjson, to_format)
   routes[#routes + 1] = {
     path = { "lines" },
     range = true,
-    flags = SEP_FLAG,
+    flags = with_io(SEP_FLAG),
     desc = "One 'path: value' per leaf, nested keys dotted (--sep to override)",
     run = function(ctx)
-      data.run(fmt, "lines", ctx.raw, { sep = ctx.flags.sep })
+      data.run(fmt, "lines", ctx.raw, { sep = ctx.flags.sep }, io_flags(ctx))
     end,
   }
   routes[#routes + 1] = {
     path = { "keys" },
     range = true,
-    flags = SEP_FLAG,
+    flags = with_io(SEP_FLAG),
     desc = "List only the (dotted) key paths, no values",
     run = function(ctx)
-      data.run(fmt, "keys", ctx.raw, { sep = ctx.flags.sep })
+      data.run(fmt, "keys", ctx.raw, { sep = ctx.flags.sep }, io_flags(ctx))
     end,
   }
   routes[#routes + 1] = {
     path = { "sort" },
     range = true,
     args = INDENT_ARG,
+    flags = with_io(),
     desc = "Pretty-print with object keys sorted (see data.format.<fmt> for why this equals 'pretty' today)",
     run = function(ctx)
-      data.run(fmt, "sort", ctx.raw, { indent = ctx.args.indent })
+      data.run(fmt, "sort", ctx.raw, { indent = ctx.args.indent }, io_flags(ctx))
     end,
   }
   routes[#routes + 1] = {
     path = { "filter" },
     range = true,
-    flags = SEP_FLAG,
+    flags = with_io(SEP_FLAG),
     desc = "Interactively filter flattened path/value entries (requires pickers.nvim)",
     run = function(ctx)
-      data.filter(fmt, ctx.raw, { sep = ctx.flags.sep })
+      data.filter(fmt, ctx.raw, { sep = ctx.flags.sep }, io_flags(ctx))
     end,
   }
 
@@ -113,9 +161,10 @@ local function make_routes(fmt, include_compact, include_ndjson, to_format)
       path = { "ndjson" },
       range = true,
       args = INDENT_ARG,
+      flags = with_io(),
       desc = "Pretty-print each line as its own JSON object; malformed lines are left untouched",
       run = function(ctx)
-        data.run(fmt, "ndjson", ctx.raw, { indent = ctx.args.indent })
+        data.run(fmt, "ndjson", ctx.raw, { indent = ctx.args.indent }, io_flags(ctx))
       end,
     }
   end
@@ -125,9 +174,10 @@ local function make_routes(fmt, include_compact, include_ndjson, to_format)
       path = { "to" },
       range = true,
       args = { { name = "format", type = "STRING", enum = { to_format } } },
+      flags = with_io(),
       desc = ("Convert to %s"):format(to_format),
       run = function(ctx)
-        data.convert(fmt, to_format, ctx.raw, {})
+        data.convert(fmt, to_format, ctx.raw, {}, io_flags(ctx))
       end,
     }
   end
@@ -171,45 +221,47 @@ local function make_data_routes()
       path = { "pretty" },
       range = true,
       args = INDENT_ARG,
-      desc = "Pretty-print, format auto-detected (fenced block or filetype)",
+      flags = with_io(),
+      desc = "Pretty-print, format auto-detected (fenced block, register contents, or filetype)",
       run = function(ctx)
-        data.run_auto("pretty", ctx.raw, { indent = ctx.args.indent })
+        data.run_auto("pretty", ctx.raw, { indent = ctx.args.indent }, io_flags(ctx))
       end,
     },
     {
       path = { "lines" },
       range = true,
-      flags = SEP_FLAG,
+      flags = with_io(SEP_FLAG),
       desc = "One 'path: value' per leaf, format auto-detected (--sep to override)",
       run = function(ctx)
-        data.run_auto("lines", ctx.raw, { sep = ctx.flags.sep })
+        data.run_auto("lines", ctx.raw, { sep = ctx.flags.sep }, io_flags(ctx))
       end,
     },
     {
       path = { "keys" },
       range = true,
-      flags = SEP_FLAG,
+      flags = with_io(SEP_FLAG),
       desc = "Only the (dotted) key paths, format auto-detected",
       run = function(ctx)
-        data.run_auto("keys", ctx.raw, { sep = ctx.flags.sep })
+        data.run_auto("keys", ctx.raw, { sep = ctx.flags.sep }, io_flags(ctx))
       end,
     },
     {
       path = { "sort" },
       range = true,
       args = INDENT_ARG,
+      flags = with_io(),
       desc = "Pretty-print with object keys sorted, format auto-detected",
       run = function(ctx)
-        data.run_auto("sort", ctx.raw, { indent = ctx.args.indent })
+        data.run_auto("sort", ctx.raw, { indent = ctx.args.indent }, io_flags(ctx))
       end,
     },
     {
       path = { "filter" },
       range = true,
-      flags = SEP_FLAG,
+      flags = with_io(SEP_FLAG),
       desc = "Interactively filter flattened path/value entries, format auto-detected (requires pickers.nvim)",
       run = function(ctx)
-        data.run_auto("filter", ctx.raw, { sep = ctx.flags.sep })
+        data.run_auto("filter", ctx.raw, { sep = ctx.flags.sep }, io_flags(ctx))
       end,
     },
   }

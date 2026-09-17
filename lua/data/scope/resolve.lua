@@ -9,9 +9,11 @@
 --- fence, or `fenced_scope.enable = false` all fall back to the previous
 --- whole-buffer behavior unchanged.
 ---
---- Register scope (`--reg=`, scratch-split output) is Phase 1 in the
---- project's concept and not implemented here yet -- this module only
---- resolves an in-buffer line span.
+--- This module only ever resolves an **in-buffer** line span. Which input
+--- an invocation actually reads (this span, or a register via `--reg`) and
+--- where its result goes (`--inplace`/`--split`/`--out-reg`) are
+--- `data.scope.source`'s and `data.scope.sink`'s jobs; both call in here for
+--- the buffer case.
 
 local M = {}
 

@@ -7,7 +7,7 @@
 | [quickstart.md](quickstart.md) | What's the first command to try? |
 | [what-you-get.md](what-you-get.md) | What do I get with zero configuration? |
 | [configuration.md](configuration.md) | What can `setup()` take, and what's the default? |
-| [commands.md](commands.md) | What does `:JSON` actually do, action by action? |
+| [commands.md](commands.md) | What does `:JSON` actually do, action by action — and how do `--reg`/`--inplace`/`--split`/`--out-reg` pick where input and output go? |
 | [BINDINGS.md](BINDINGS.md) | Full commands/keymaps/autocmds cheatsheet. |
 | [integrations.md](integrations.md) | What does this plugin do with other plugins installed (color_my_ascii)? |
 | [scope.md](scope.md) | What does this plugin do, and deliberately not do (yet)? |

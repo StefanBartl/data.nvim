@@ -92,6 +92,53 @@ back as `lines`-style text. This is also why `filter` is offered on `:JSON`,
 share across all three formats, so there is nothing format-specific to opt in
 or out of.
 
+## Source and target are two decisions, not one scope
+
+Every action does the same two things before any decoding happens: resolve
+*where the input comes from* (`data.scope.source`) and *where the result goes*
+(`data.scope.sink`). `run`/`convert`/`filter` then decode and render something
+that knows about neither, and hand the lines to the sink.
+
+Splitting them that way is what makes the flag matrix small instead of
+combinatorial. `--reg` is purely a source, `--inplace`/`--split`/`--out-reg`
+are purely targets, and the only coupling between them is the default: a
+buffer/selection source replaces itself, a register source opens a split. Every
+other pairing falls out for free, including the two that are genuinely useful
+and would have needed special cases otherwise — `:JSON lines --split` (flatten
+this buffer, keep the original) and `:'<,'>JSON pretty --reg=+ --inplace`
+(paste the formatted clipboard over a selection).
+
+It also moved one check to where it actually belongs. `'modifiable'` used to
+gate every invocation at scope-resolution time, which was correct only as long
+as the result always went back into the buffer. A read-only buffer is a
+perfectly good source for `--split`/`--out-reg`, so the check now lives in the
+in-place write and nowhere else.
+
+### `--out-reg`, not `--reg`, for the register target
+
+The concept listed `--inplace`/`--split`/`--reg=<name>` as the target flags,
+while using `--reg=<name>` one paragraph earlier for the register *source*. One
+flag name cannot mean both "read from here" and "write to there" on the same
+command line. The source kept `--reg` — that is the reading the roadmap's Phase
+1 entry spells out first and in most detail, and it is the more common of the
+two by a wide margin — and the register target became `--out-reg`.
+
+### `--reg --inplace` needs a range
+
+With a register source and no range, "in place" can only mean the whole buffer,
+so the combination would quietly replace an entire file with clipboard
+contents. It is refused with a message saying so rather than being either
+silently allowed or silently ignored. With an explicit range or Visual
+selection it is exactly what it looks like, and is allowed.
+
+### `filter` only pays for the extmark when it needs to
+
+`filter`'s in-place path anchors its scope to an extmark across the interactive
+prompt, because the buffer can change arbitrarily while a person builds a
+clause stack. A `--split`/`--out-reg` target writes somewhere that did not
+exist yet when the prompt opened, so it needs none of that — the extmark is
+only created for an in-place target.
+
 ## `:Data` reuses the fenced-block lookup it's already paying for
 
 `data.detect.format` doesn't add a second fence-scanning mechanism next to

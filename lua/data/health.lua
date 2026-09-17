@@ -57,6 +57,16 @@ function M.check()
     )
   end
 
+  local window_ok, window_mod = pcall(require, "lib.nvim.window")
+  if window_ok and type(window_mod.open_scratch_split) == "function" then
+    ok("lib.nvim.window.open_scratch_split available (--split / register-scope results)")
+  else
+    err(
+      "lib.nvim.window.open_scratch_split not found -- lib.nvim is outdated",
+      { "Update StefanBartl/lib.nvim to a version that ships window.open_scratch_split" }
+    )
+  end
+
   local xml_ok, xml_mod = pcall(require, "lib.lua.xml")
   if xml_ok and type(xml_mod.decode) == "function" and type(xml_mod.encode) == "function" then
     ok("lib.lua.xml available (:XML pretty/compact/lines/keys/sort)")

@@ -21,6 +21,12 @@ local DEFAULTS = {
   fenced_scope = {
     enable = true,
   },
+  register = {
+    default = "+",
+  },
+  target = {
+    split = "right",
+  },
   keymaps = {
     preset = false,
   },

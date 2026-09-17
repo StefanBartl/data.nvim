@@ -6,8 +6,9 @@ Calling `require("data").setup()` with no arguments (or `opts = {}` under lazy.n
   `sort`, `filter`) and `:YAML` (the same five, minus `compact`) are registered
   and ready — see [commands.md](commands.md).
 - `:Data` is also registered: `pretty`/`lines`/`keys`/`sort`/`filter` with the
-  format auto-detected (fenced block, else buffer filetype) instead of named
-  by the command — see [commands.md](commands.md#data--format-auto-detected).
+  format auto-detected (fenced block, register contents under `--reg`, else
+  buffer filetype) instead of named by the command — see
+  [commands.md](commands.md#data--format-auto-detected).
 - No default keymaps and no default autocmds are bound. data.nvim's actions are Ex
   commands, not motions or toggles, so there is nothing to bind by default (see
   `data.config.DEFAULTS`'s `keymaps.preset`, currently always `false`).
@@ -26,3 +27,10 @@ Calling `require("data").setup()` with no arguments (or `opts = {}` under lazy.n
 - `filter` (on any of the four commands) needs
   [pickers.nvim](https://github.com/StefanBartl/pickers.nvim) installed —
   every other action works regardless. See [integrations.md](integrations.md).
+- Every action takes `--reg`/`--reg=<name>` to read from a register instead of
+  the buffer, and `--inplace`/`--split`/`--out-reg=<name>` to say where the
+  result goes. The defaults need no flags at all: a buffer or selection scope
+  replaces itself, a register source opens a scratch split. A bare `--reg`
+  means the system clipboard (`register.default`), and `--split` opens to the
+  right (`target.split`) — see
+  [commands.md](commands.md#source-and-target-flags).

@@ -19,6 +19,12 @@ require("data").setup({
   fenced_scope = {
     enable = true, -- scope to an enclosing ```json/```yaml/```xml block when color_my_ascii is installed
   },
+  register = {
+    default = "+", -- which register a bare `--reg` / `--out-reg` reads from / writes to
+  },
+  target = {
+    split = "right", -- where `--split` opens: "above"|"below"|"left"|"right"|"auto"
+  },
   keymaps = {
     preset = false, -- reserved: no default keymap preset exists yet
   },
@@ -32,6 +38,20 @@ given.
 `fenced_scope.enable = false` always uses whole-buffer scope, even with
 `color_my_ascii.nvim` installed and the cursor inside a matching fence — see
 [integrations.md](integrations.md).
+
+`register.default` is the register a bare `--reg`/`--out-reg` uses; `--reg=x`
+names one explicitly and ignores this. `+` is the system clipboard — the case
+the register scope exists for is "I copied a payload out of a ticket tool". On
+a Neovim without a clipboard provider, `+` is permanently empty, so a *bare*
+`--reg` falls back to `"` and says so; an explicitly typed `--reg=+` is left
+alone and fails with the ordinary "register is empty" message instead, because
+that one was the user's own choice. See
+[commands.md](commands.md#source-and-target-flags).
+
+`target.split` is where `--split` (and a register source's default target)
+opens its scratch window. `"auto"` — or any value that isn't one of the four
+directions — uses a plain `:new`, honoring your own `'splitbelow'`/
+`'splitright'`.
 
 `keymaps.preset` is a placeholder for a future default keymap set; setting it to
 `true` today has no effect, since none is defined (see

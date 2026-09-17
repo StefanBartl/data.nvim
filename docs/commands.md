@@ -18,6 +18,64 @@ so every action and flag below also has `<Tab>` completion.
 | `to json` | **`:YAML` only.** Convert the scope to JSON, in place. |
 | `filter [--sep=X]` | Interactively reduce the flattened `path`/`value` entries down to the ones matching a clause stack, replacing the scope with the survivors' `lines`-style text. **Requires [pickers.nvim](https://github.com/StefanBartl/pickers.nvim).** |
 
+Every action also takes the source/target flags below.
+
+## Source and target flags
+
+Where the input comes from, and where the result goes. Available on every
+action of every verb, in any order, alongside that action's own args/flags.
+
+| Flag | What it does |
+| --- | --- |
+| `--reg` / `--reg=<name>` | Read the input from a register instead of the buffer. Bare `--reg` uses `register.default` (`+`, the system clipboard). |
+| `--inplace` | Write the result back over the buffer scope. |
+| `--split` | Write the result into a fresh scratch split (`target.split` picks the direction). |
+| `--out-reg` / `--out-reg=<name>` | Write the result into a register. Bare `--out-reg` uses `register.default`. |
+
+**Defaults follow the source.** A buffer or selection scope replaces itself
+(`--inplace`); a register source opens a split (`--split`), because the point
+of reading from a register is not to touch the buffer you happen to be sitting
+in. So `:JSON pretty --reg=+` formats the clipboard into a new split and leaves
+the current buffer alone, and plain `:JSON pretty` behaves exactly as it always
+has.
+
+```vim
+:JSON pretty --reg=+          " format the clipboard into a scratch split
+:JSON lines --split           " flatten this buffer, result beside it
+:JSON compact --out-reg=+     " minify this buffer back onto the clipboard
+:'<,'>JSON pretty --reg=+ --inplace  " paste the formatted clipboard over the selection
+```
+
+**Refusals, on purpose:**
+
+- The three target flags are mutually exclusive — two at once is an error, not
+  a ranking.
+- `--reg --inplace` needs an explicit range or visual selection. Without one,
+  "in place" would mean the whole buffer, and replacing an entire file with
+  register contents is not something a formatting command should be able to do
+  by accident.
+- `--out-reg` refuses Vim's read-only registers (`:`, `.`, `%`, `#`, `=`) by
+  name rather than failing inside `setreg`.
+- An empty register is reported (`register '+' is empty`); nothing is written.
+
+**`--out-reg` says what it did.** A register write is invisible, so it reports
+`wrote 12 line(s) to register '+'` rather than looking like it did nothing.
+
+**Read-only buffers** are perfectly good *sources* for `--split`/`--out-reg`.
+Only the in-place write needs `'modifiable'`, and that is the only place it is
+checked.
+
+**Bare `:JSON`/`:YAML`/`:XML`/`:Data`** (no action) is still whole-buffer,
+in-place pretty-printing; flags need an explicit action
+(`:JSON pretty --split`).
+
+**The result split** is a `nofile` scratch buffer, wiped when hidden, named
+`data://json pretty (+) [1]` and modifiable so a line can be trimmed before
+yanking it back. Each run opens its own — a second one never overwrites the
+first. Its `'filetype'` is the result's format (`json`/`yaml`/`xml`), except
+for `lines`/`keys`/`filter`, whose flattened `path: value` text is not a
+document in any of the three.
+
 **`sort` vs `pretty`:** identical output today, for all three formats. Neither
 JSON's nor YAML's decoder preserves the source's original key order, and both
 encoders sort object keys by default; XML's encoder always sorts attribute names
@@ -51,15 +109,19 @@ reaching for one of those already means knowing whether it's JSON, YAML or
 XML, which is exactly the choice `:Data` exists to skip. The format comes
 from, in order:
 
-1. The enclosing fenced code block's language tag, when the cursor sits
+1. With `--reg`, the register's own first non-blank line: `{`/`[` is JSON,
+   `<` is XML, a `---` marker / `- ` sequence item / `key:` mapping line is
+   YAML. Neither the fenced block nor the filetype says anything about text
+   that never came from this buffer, so neither is consulted in that case.
+2. The enclosing fenced code block's language tag, when the cursor sits
    inside one, no explicit range was given, and `fenced_scope.enable` isn't
    `false` — same source as [integrations.md](integrations.md)'s
    `color_my_ascii.nvim` scope, just without a fixed language to look for.
-2. The buffer's own `'filetype'` otherwise (a compound filetype like
+3. The buffer's own `'filetype'` otherwise (a compound filetype like
    `yaml.docker-compose` is read by its first dotted component).
 
-Neither found: a clear error naming the buffer's filetype, not a guess — use
-`:JSON`/`:YAML`/`:XML` directly instead.
+None of them found: a clear error naming the buffer's filetype (or the
+register), not a guess — use `:JSON`/`:YAML`/`:XML` directly instead.
 
 **Scope:** an explicit range (`:5,12JSON compact`) or visual selection
 (`'<,'>YAML lines`) always wins. Without one: if the cursor sits inside a
@@ -67,9 +129,10 @@ matching ` ```json `/` ```yaml `/` ```xml ` fenced code block and
 [color_my_ascii.nvim](https://github.com/StefanBartl/color_my_ascii.nvim) is
 installed, that block's interior is the scope (see
 [integrations.md](integrations.md)); otherwise the whole buffer. Either way,
-only the resolved lines are decoded and replaced. Register scope (`--reg=`,
-output to a scratch split instead of the buffer) is planned but not implemented
-yet — see [scope.md](scope.md).
+only the resolved lines are decoded and replaced — unless `--reg` names a
+register as the input instead, in which case the buffer is not read at all and
+the range (if any) only says where an `--inplace` result would go. See
+[Source and target flags](#source-and-target-flags).
 
 **Errors:** malformed input in the resolved scope leaves the buffer untouched and
 reports a notification (`[data] JSON decode failed: ...`) instead of partially

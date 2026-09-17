@@ -20,5 +20,15 @@ A few more:
 '<,'>JSON compact          " only the visual selection, not the whole buffer
 ```
 
-See [commands.md](commands.md) for every action, and [what-you-get.md](what-you-get.md)
-for what's on by default with zero configuration.
+Without pasting anything first — straight from the clipboard, result in a
+scratch split, current buffer untouched:
+
+```
+:JSON pretty --reg=+       " format what you copied out of the ticket tool
+:JSON compact --out-reg=+  " minify this buffer back onto the clipboard
+```
+
+See [commands.md](commands.md) for every action and for the
+[source/target flags](commands.md#source-and-target-flags), and
+[what-you-get.md](what-you-get.md) for what's on by default with zero
+configuration.

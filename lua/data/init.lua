@@ -1,10 +1,18 @@
 ---@module 'data'
 --- Public facade for data.nvim: `setup()` plus the range-aware `run()`/
 --- `convert()` actions every `:JSON`/`:YAML`/`:XML` route calls into.
+---
+--- Every action takes the same two decisions before it does any work:
+--- *where does the input come from* (`data.scope.source`: the buffer scope,
+--- or a register via `--reg`) and *where does the result go*
+--- (`data.scope.sink`: `--inplace`, `--split`, `--out-reg`, defaulting to
+--- whichever matches the source). Decode/render in between is unchanged and
+--- knows about neither.
 
 local config = require("data.config")
 local formats = require("data.format")
-local scope = require("data.scope.resolve")
+local source_scope = require("data.scope.source")
+local sink_scope = require("data.scope.sink")
 local raw_notify = require("lib.nvim.notify").create("[data]")
 
 local M = {}
@@ -35,7 +43,32 @@ local notify = {
       raw_notify.warn(msg)
     end)
   end,
+  info = function(msg)
+    vim.schedule(function()
+      raw_notify.info(msg)
+    end)
+  end,
 }
+
+---@internal
+--- Surface a `Data.Problem` from `data.scope.source`/`data.scope.sink`,
+--- which report failures rather than notifying themselves (see those
+--- modules' doc comments). `prefix` names the action when the message alone
+--- wouldn't ("JSON filter: ...").
+---@param problem Data.Problem|nil
+---@param prefix? string
+---@return nil
+local function report(problem, prefix)
+  if not problem then
+    return
+  end
+  local msg = (prefix or "") .. problem.msg
+  if problem.level == "warn" then
+    notify.warn(msg)
+  else
+    notify.error(msg)
+  end
+end
 
 ---@internal
 --- Resolve a per-invocation option against its configured default. Falls
@@ -89,42 +122,85 @@ end
 local safe_call = require("data.util.safe_call")
 
 ---@internal
---- Shared prelude for `run`/`convert`: modifiable check, scope resolution,
---- non-empty check. Already notifies on failure, so callers only need to
---- check for a nil `s0`.
+--- Shared prelude for `run`/`convert`/`filter`: resolve where the input
+--- comes from and where the result goes, in that order (the target's
+--- default depends on the source). Already notifies on failure, so callers
+--- only need to check for a nil source.
+---
+--- Note what is NOT checked here any more: `modifiable`. It used to gate
+--- every invocation, which was wrong the moment a result could go somewhere
+--- other than the buffer -- a read-only buffer is a perfectly good source
+--- for `--split`/`--out-reg`. The check moved into the in-place write in
+--- `data.scope.sink`, which is the only place it actually applies.
 ---@param bufnr integer
 ---@param cmd Lib.UserCommand.Args
----@param fmt string
----@return integer|nil s0, integer|nil e0, string[]|nil src
-local function resolve_scope(bufnr, cmd, fmt)
-  if not vim.bo[bufnr].modifiable then
-    notify.error("buffer is not modifiable")
-    return nil, nil, nil
+---@param fmt string|nil
+---@param flags Data.IOFlags|nil
+---@return Data.Source|nil source
+---@return Data.Sink|nil sink
+local function resolve_io(bufnr, cmd, fmt, flags)
+  local source, sproblem = source_scope.resolve(bufnr, cmd, fmt, flags)
+  if not source then
+    report(sproblem)
+    return nil, nil
   end
-  local s0, e0 = scope.lines(bufnr, cmd, fmt)
-  local src = vim.api.nvim_buf_get_lines(bufnr, s0, e0 + 1, false)
-  if #src == 0 then
-    notify.warn("nothing to process (empty range)")
-    return nil, nil, nil
+  if source.note then
+    notify.warn(source.note)
   end
-  return s0, e0, src
+
+  local sink, kproblem = sink_scope.resolve(source, flags or {})
+  if not sink then
+    report(kproblem)
+    return nil, nil
+  end
+
+  return source, sink
 end
 
 ---@internal
---- `:JSON ndjson`: treat each non-blank line of the scope as its own JSON
---- object (rather than the whole scope as one document) and pretty-print it
---- in place. A line that fails to decode is left completely unchanged --
---- one bad line in a log dump shouldn't block reformatting the rest -- and
---- the total skipped is reported once as a single warning afterwards.
+--- Render modes whose output is flattened `path: value` text rather than a
+--- document in the source format -- a `--split` result buffer must not
+--- claim `'filetype'` json/yaml/xml for those.
+---@type table<string, true>
+local TEXT_MODES = { lines = true, keys = true, filter = true }
+
+---@internal
+--- Hand `lines` to the resolved target and report whatever came back.
+---@param sink Data.Sink
+---@param source Data.Source
+---@param lines string[]
+---@param fmt string
+---@param mode string
+---@param prefix? string # passed through to `report`
+---@return nil
+local function deliver(sink, source, lines, fmt, mode, prefix)
+  local ok, problem, note = sink_scope.write(sink, source, lines, {
+    filetype = (not TEXT_MODES[mode]) and fmt or nil,
+    label = ("%s %s%s"):format(fmt, mode, source.reg and (" (" .. source.reg .. ")") or ""),
+  })
+  if not ok then
+    report(problem, prefix)
+    return
+  end
+  if note then
+    -- A register target writes nothing visible; say what happened, or the
+    -- command looks like it silently did nothing at all.
+    notify.info((prefix or "") .. note)
+  end
+end
+
+---@internal
+--- `:JSON ndjson`: treat each non-blank line of the input as its own JSON
+--- object (rather than the whole input as one document) and pretty-print
+--- it. A line that fails to decode is left completely unchanged -- one bad
+--- line in a log dump shouldn't block reformatting the rest -- and the
+--- total skipped is reported once as a single warning afterwards.
 ---@param formatter Data.Formatter
 ---@param fmt string
----@param bufnr integer
----@param s0 integer
----@param e0 integer
 ---@param src string[]
 ---@param opts Data.RenderOpts
----@return nil
-local function run_ndjson(formatter, fmt, bufnr, s0, e0, src, opts)
+---@return string[] out
+local function run_ndjson(formatter, fmt, src, opts)
   -- Hoisted out of the loop below -- this is the one loop in the plugin
   -- whose iteration count scales with user input (ndjson line count), so a
   -- per-line table-field lookup is worth avoiding here specifically.
@@ -149,7 +225,6 @@ local function run_ndjson(formatter, fmt, bufnr, s0, e0, src, opts)
     end
   end
 
-  vim.api.nvim_buf_set_lines(bufnr, s0, e0 + 1, false, out)
   if skipped > 0 then
     -- A high skip ratio usually means the scope isn't actually ndjson at
     -- all (wrong command, wrong range) rather than "a few bad lines in an
@@ -174,47 +249,58 @@ local function run_ndjson(formatter, fmt, bufnr, s0, e0, src, opts)
       )
     end
   end
+
+  return out
 end
 
---- Format/filter the resolved scope (range, fenced block, or whole buffer)
---- of the current buffer in place.
+---@internal
+--- Per-invocation args/flags win when given (":JSON pretty 4"); otherwise
+--- fall back to the resolved config.<fmt>.indent/sep -- before these were
+--- read here, the config values were merged/typed but never actually read
+--- anywhere, so a user-set json.indent silently had no effect.
+---@param fmt string
+---@param opts Data.RenderOpts|nil
+---@return Data.RenderOpts
+local function resolve_render_opts(fmt, opts)
+  opts = opts or {}
+  local defaults = config.get(fmt) or {}
+  return {
+    indent = resolve_indent(opts.indent, defaults.indent),
+    sep = opt_or_default(opts.sep, defaults.sep),
+  }
+end
+
+--- Format the resolved input -- the buffer scope (range, fenced block, or
+--- whole buffer) or a register (`--reg`) -- and deliver the result to the
+--- resolved target (in place, a scratch split, or a register).
 ---@param fmt string              # "json"|"yaml"|"xml"
 ---@param mode Data.RenderMode
 ---@param cmd Lib.UserCommand.Args # the raw nvim user-command args (range info)
 ---@param opts? Data.RenderOpts    # per-invocation override; falls back to config.<fmt>.indent/sep when a field is nil
+---@param flags? Data.IOFlags      # --reg / --inplace / --split / --out-reg
 ---@return nil
-function M.run(fmt, mode, cmd, opts)
+function M.run(fmt, mode, cmd, opts, flags)
   local formatter = formats.get(fmt)
   if not formatter then
     notify.error(("unknown format '%s'"):format(tostring(fmt)))
     return
   end
 
-  -- Per-invocation args/flags win when given (":JSON pretty 4"); otherwise
-  -- fall back to the resolved config.<fmt>.indent/sep -- previously these
-  -- config values were merged/typed but never actually read anywhere, so a
-  -- user-set json.indent silently had no effect.
-  opts = opts or {}
-  local defaults = config.get(fmt) or {}
-  opts = {
-    indent = resolve_indent(opts.indent, defaults.indent),
-    sep = opt_or_default(opts.sep, defaults.sep),
-  }
+  opts = resolve_render_opts(fmt, opts)
 
   local bufnr = vim.api.nvim_get_current_buf()
-  local s0, e0, src = resolve_scope(bufnr, cmd, fmt)
-  if not s0 then
+  local source, sink = resolve_io(bufnr, cmd, fmt, flags)
+  if not source then
     return
   end
-  ---@cast e0 integer
-  ---@cast src string[]
+  ---@cast sink Data.Sink
 
   if mode == "ndjson" then
-    run_ndjson(formatter, fmt, bufnr, s0, e0, src, opts)
+    deliver(sink, source, run_ndjson(formatter, fmt, source.lines, opts), fmt, mode)
     return
   end
 
-  local value, derr = safe_call(formatter.decode, table.concat(src, "\n"))
+  local value, derr = safe_call(formatter.decode, table.concat(source.lines, "\n"))
   if derr then
     notify.error(("%s decode failed: %s"):format(fmt:upper(), derr))
     return
@@ -226,7 +312,7 @@ function M.run(fmt, mode, cmd, opts)
     return
   end
 
-  vim.api.nvim_buf_set_lines(bufnr, s0, e0 + 1, false, out)
+  deliver(sink, source, out, fmt, mode)
 end
 
 --- Convert the resolved scope from `src_fmt` to `dst_fmt`, replacing it with
@@ -238,8 +324,9 @@ end
 ---@param dst_fmt string
 ---@param cmd Lib.UserCommand.Args
 ---@param opts? Data.RenderOpts
+---@param flags? Data.IOFlags
 ---@return nil
-function M.convert(src_fmt, dst_fmt, cmd, opts)
+function M.convert(src_fmt, dst_fmt, cmd, opts, flags)
   local src_formatter = formats.get(src_fmt)
   local dst_formatter = formats.get(dst_fmt)
   if not (src_formatter and dst_formatter) then
@@ -247,22 +334,16 @@ function M.convert(src_fmt, dst_fmt, cmd, opts)
     return
   end
 
-  opts = opts or {}
-  local defaults = config.get(dst_fmt) or {}
-  opts = {
-    indent = resolve_indent(opts.indent, defaults.indent),
-    sep = opt_or_default(opts.sep, defaults.sep),
-  }
+  opts = resolve_render_opts(dst_fmt, opts)
 
   local bufnr = vim.api.nvim_get_current_buf()
-  local s0, e0, src = resolve_scope(bufnr, cmd, src_fmt)
-  if not s0 then
+  local source, sink = resolve_io(bufnr, cmd, src_fmt, flags)
+  if not source then
     return
   end
-  ---@cast e0 integer
-  ---@cast src string[]
+  ---@cast sink Data.Sink
 
-  local value, derr = safe_call(src_formatter.decode, table.concat(src, "\n"))
+  local value, derr = safe_call(src_formatter.decode, table.concat(source.lines, "\n"))
   if derr then
     notify.error(("%s decode failed: %s"):format(src_fmt:upper(), derr))
     return
@@ -274,73 +355,79 @@ function M.convert(src_fmt, dst_fmt, cmd, opts)
     return
   end
 
-  vim.api.nvim_buf_set_lines(bufnr, s0, e0 + 1, false, out)
+  -- The result is a `dst_fmt` document, so that is what a `--split` result
+  -- buffer's 'filetype' has to say -- not the format it was read from.
+  deliver(sink, source, out, dst_fmt, "pretty")
 end
 
---- Interactively filter the resolved scope down to the flattened path/value
+--- Interactively filter the resolved input down to the flattened path/value
 --- entries matching a user-built `pickers.refine` clause stack (`:JSON
---- filter`/`:YAML filter`/`:XML filter`), replacing the scope with the
---- survivors' `lines`-style text. See `data.filter` for the actual clause
---- loop; this only resolves scope/decode and writes the result back, same
+--- filter`/`:YAML filter`/`:XML filter`), then deliver the survivors'
+--- `lines`-style text to the resolved target. See `data.filter` for the
+--- actual clause loop; this only resolves source/target and decode, same
 --- shape as `run`/`convert`, except the write happens later, from
 --- `data.filter`'s `on_done` callback, once the interactive part is over.
 ---
---- That gap is exactly why this cannot reuse `run`/`convert`'s plain
---- `s0`/`e0` line pair unchanged: the clause-building prompt can take an
---- arbitrary amount of time (however long a person takes to pick fields and
---- type terms), and nothing stops the buffer from being edited elsewhere,
---- made unmodifiable, or closed outright in that window -- a plain line
---- pair captured before the prompt opened would then either write over the
---- wrong lines or throw a raw "invalid buffer" error out of an async
---- callback. An extmark tracks the scope's actual position across whatever
---- happens meanwhile (shrinking/growing with edits inside it the same way
---- any other extmark does), and buffer validity/`modifiable` are checked
---- again right before the write, not just once up front.
+--- That gap is exactly why an in-place target here cannot reuse
+--- `run`/`convert`'s plain `s0`/`e0` line pair unchanged: the clause-building
+--- prompt can take an arbitrary amount of time (however long a person takes
+--- to pick fields and type terms), and nothing stops the buffer from being
+--- edited elsewhere, made unmodifiable, or closed outright in that window --
+--- a plain line pair captured before the prompt opened would then either
+--- write over the wrong lines or throw a raw "invalid buffer" error out of
+--- an async callback. An extmark tracks the scope's actual position across
+--- whatever happens meanwhile (shrinking/growing with edits inside it the
+--- same way any other extmark does), and buffer validity/`modifiable` are
+--- checked again right before the write (in `data.scope.sink`), not just
+--- once up front. A `--split`/`--out-reg` target needs none of that: it
+--- writes somewhere that did not exist yet when the prompt opened.
 ---@param fmt string              # "json"|"yaml"|"xml"
 ---@param cmd Lib.UserCommand.Args
 ---@param opts? Data.RenderOpts
+---@param flags? Data.IOFlags
 ---@return nil
-function M.filter(fmt, cmd, opts)
+function M.filter(fmt, cmd, opts, flags)
   local formatter = formats.get(fmt)
   if not formatter then
     notify.error(("unknown format '%s'"):format(tostring(fmt)))
     return
   end
 
-  opts = opts or {}
-  local defaults = config.get(fmt) or {}
-  opts = {
-    indent = resolve_indent(opts.indent, defaults.indent),
-    sep = opt_or_default(opts.sep, defaults.sep),
-  }
+  opts = resolve_render_opts(fmt, opts)
 
   local bufnr = vim.api.nvim_get_current_buf()
-  local s0, e0, src = resolve_scope(bufnr, cmd, fmt)
-  if not s0 then
+  local source, sink = resolve_io(bufnr, cmd, fmt, flags)
+  if not source then
     return
   end
-  ---@cast e0 integer
-  ---@cast src string[]
+  ---@cast sink Data.Sink
 
-  local value, derr = safe_call(formatter.decode, table.concat(src, "\n"))
+  local value, derr = safe_call(formatter.decode, table.concat(source.lines, "\n"))
   if derr then
     notify.error(("%s decode failed: %s"):format(fmt:upper(), derr))
     return
   end
 
-  local mark_id = vim.api.nvim_buf_set_extmark(bufnr, FILTER_NS, s0, 0, {
-    end_row = e0 + 1,
-    end_col = 0,
-  })
-  local function del_mark()
-    if vim.api.nvim_buf_is_valid(bufnr) then
-      pcall(vim.api.nvim_buf_del_extmark, bufnr, FILTER_NS, mark_id)
+  local prefix = ("%s filter: "):format(fmt:upper())
+
+  local mark_id, del_mark
+  if sink.kind == "inplace" then
+    mark_id = vim.api.nvim_buf_set_extmark(bufnr, FILTER_NS, source.s0, 0, {
+      end_row = (source.e0 or 0) + 1,
+      end_col = 0,
+    })
+    del_mark = function()
+      if vim.api.nvim_buf_is_valid(bufnr) then
+        pcall(vim.api.nvim_buf_del_extmark, bufnr, FILTER_NS, mark_id)
+      end
     end
+  else
+    del_mark = function() end
   end
 
   require("data.filter").run(formatter, value, opts, function(out, ferr)
     if ferr then
-      notify.error(("%s filter: %s"):format(fmt:upper(), ferr))
+      notify.error(prefix .. ferr)
       del_mark()
       return
     end
@@ -350,57 +437,55 @@ function M.filter(fmt, cmd, opts)
       return
     end
     if #out == 0 then
-      notify.warn(("%s filter: no entries matched -- scope left unchanged"):format(fmt:upper()))
+      notify.warn(prefix .. "no entries matched -- nothing written")
       del_mark()
       return
     end
 
-    if not vim.api.nvim_buf_is_valid(bufnr) then
-      notify.error(
-        ("%s filter: buffer was closed before the filter finished -- discarding the result"):format(
-          fmt:upper()
+    if mark_id then
+      if not vim.api.nvim_buf_is_valid(bufnr) then
+        notify.error(
+          prefix .. "buffer was closed before the filter finished -- discarding the result"
         )
-      )
-      return
-    end
-    if not vim.bo[bufnr].modifiable then
-      notify.error(
-        ("%s filter: buffer is no longer modifiable -- discarding the result"):format(fmt:upper())
-      )
+        return
+      end
+      local mark = vim.api.nvim_buf_get_extmark_by_id(bufnr, FILTER_NS, mark_id, { details = true })
+      source.s0 = mark[1]
+      source.e0 = (mark[3] and mark[3].end_row) and (mark[3].end_row - 1) or source.e0
       del_mark()
-      return
     end
 
-    local mark = vim.api.nvim_buf_get_extmark_by_id(bufnr, FILTER_NS, mark_id, { details = true })
-    local live_s0 = mark[1]
-    local live_e0 = (mark[3] and mark[3].end_row) and (mark[3].end_row - 1) or e0
-    del_mark()
-
-    vim.api.nvim_buf_set_lines(bufnr, live_s0, live_e0 + 1, false, out)
+    deliver(sink, source, out, fmt, "filter", prefix)
   end)
 end
 
 --- Auto-detect the format for a `:Data <action>` invocation (an enclosing
 --- fenced code block's language when the cursor sits inside one and no
---- explicit range was given, otherwise the buffer's own filetype -- see
---- `data.detect`) and dispatch to `run`/`filter` accordingly. `:JSON`/
---- `:YAML`/`:XML` never need this: the verb itself already says the format.
+--- explicit range was given, the register's own first non-blank line under
+--- `--reg`, otherwise the buffer's own filetype -- see `data.detect`) and
+--- dispatch to `run`/`filter` accordingly. `:JSON`/`:YAML`/`:XML` never
+--- need this: the verb itself already says the format.
 ---@param action string # "pretty"|"lines"|"keys"|"sort"|"filter" -- the format-agnostic subset every formatter supports the same way
 ---@param cmd Lib.UserCommand.Args
 ---@param opts? Data.RenderOpts
+---@param flags? Data.IOFlags
 ---@return nil
-function M.run_auto(action, cmd, opts)
+function M.run_auto(action, cmd, opts, flags)
   local bufnr = vim.api.nvim_get_current_buf()
-  local fmt, derr = require("data.detect").format(bufnr, cmd)
+  -- A register named here is read twice: once for the format sniff, once
+  -- for the source itself further down. Reading a register has no side
+  -- effects and no cost worth threading a pre-resolved source through two
+  -- public functions to avoid.
+  local fmt, derr = require("data.detect").format(bufnr, cmd, flags)
   if not fmt then
     notify.error(derr)
     return
   end
 
   if action == "filter" then
-    M.filter(fmt, cmd, opts)
+    M.filter(fmt, cmd, opts, flags)
   else
-    M.run(fmt, action, cmd, opts)
+    M.run(fmt, action, cmd, opts, flags)
   end
 end
 

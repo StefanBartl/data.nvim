@@ -34,15 +34,25 @@
 - `:Data pretty`/`lines`/`keys`/`sort`/`filter` — the same actions as above,
   minus the format-specific ones (`compact`/`ndjson`/`to`), with the format
   auto-detected instead of named by the command: the enclosing fenced
-  block's language tag when the cursor is inside one, otherwise the
-  buffer's own `'filetype'`. A clear error, not a guess, when neither maps
-  to json/yaml/xml — use `:JSON`/`:YAML`/`:XML` directly in that case.
+  block's language tag when the cursor is inside one, the register's own
+  first non-blank line under `--reg`, otherwise the buffer's own
+  `'filetype'`. A clear error, not a guess, when none of them maps to
+  json/yaml/xml — use `:JSON`/`:YAML`/`:XML` directly in that case.
+- Read the input from a register instead of the buffer (`:JSON pretty --reg=+`)
+  and open the result in a scratch split, so a payload copied out of a ticket
+  tool can be formatted without touching whatever buffer you happen to be in.
+- Choose where any result goes, per invocation: `--inplace` (the default for a
+  buffer/selection scope), `--split`, or `--out-reg=<name>` (write it back into
+  a register). See [commands.md](commands.md#source-and-target-flags).
 - Leave the buffer untouched on invalid input, with a clear error notification.
 
 ## Does not (yet)
 
-1. **Register scope.** `:JSON pretty --reg=+` (read from a register, write to a
-   scratch split instead of the buffer) is designed but not built.
+1. **Object reconstruction after `filter`.** The filter result is a flat
+   `path: value` line list, not a re-nested JSON/YAML document containing only
+   the surviving keys. Recovering array- vs. map-shaped intermediate nodes from
+   plain path strings is ambiguous without a schema — the same problem
+   [architecture.md](architecture.md) describes for XML→JSON.
 2. **`to xml`/`from xml`.** XML's decoded shape is a raw element tree
    (`{tag, attrs, children}`), not a plain map/array like JSON/YAML — converting
    either way would mean guessing a schema (which repeated sibling tag becomes an
@@ -69,8 +79,10 @@ framework; its `refine` filter-stack module backs `:JSON filter`/`:YAML filter`/
 action in this plugin that does not work without it.
 
 **[`diff.nvim`](https://github.com/StefanBartl/diff.nvim)** before/after preview of
-a filter result is a natural next step now that `filter` exists, but is not built —
-`filter` replaces the scope in place today, the same way every other action does.
+a filter result is a natural next step now that `filter` exists, but is not built.
+`--split` covers part of the same need in a cruder way — `:JSON filter --split`
+leaves the original scope untouched and puts the survivors beside it, so the two
+can be compared by eye without a diff.
 
 **[`ai.nvim`](https://github.com/StefanBartl/ai.nvim)** optionally consumes this
 plugin, never the other way around: its `context.structured_data` flag (see

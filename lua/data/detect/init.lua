@@ -16,6 +16,10 @@
 ---      dotted component.
 ---
 --- Neither found: `nil, err` -- there is no third guess to fall back to.
+---
+--- A register source (`:Data ... --reg=+`) skips both: neither signal says
+--- anything about text that never came from this buffer. It sniffs the
+--- register's own first non-blank line instead -- see `M.from_text`.
 
 local M = {}
 
@@ -65,12 +69,74 @@ local function fenced_block_format(bufnr)
   return FORMAT_BY_FENCE_LANG[block.lang]
 end
 
+--- Guess a data.nvim format from the text itself, for input that has no
+--- buffer behind it to ask about (a register).
+---
+--- Deliberately a shallow first-characters heuristic, not a parse: `{`/`[`
+--- is JSON, `<` is XML, and a leading `---` document marker, a `- ` sequence
+--- item or a `key:` mapping line is YAML. Anything else is `nil` -- a wrong
+--- guess here would hand the text to the wrong decoder and report a decode
+--- error about a format the user never meant, which reads as a bug in the
+--- data rather than a missed guess. `:JSON`/`:YAML`/`:XML` name the format
+--- outright and never come through here.
+---@param text string
+---@return string|nil fmt
+function M.from_text(text)
+  local first = text:match("[^\r\n]*%S[^\r\n]*")
+  if not first then
+    return nil
+  end
+  first = first:gsub("^%s+", "")
+
+  local head = first:sub(1, 1)
+  if head == "{" or head == "[" then
+    return "json"
+  end
+  if head == "<" then
+    return "xml"
+  end
+  if first:match("^%-%-%-") or first:match("^%-%s") or first:match("^[%w_%-%.\"']+%s*:%s*") then
+    return "yaml"
+  end
+  return nil
+end
+
+---@internal
+--- The format of the register a `--reg` flag names, for `:Data --reg=...`.
+---@param flags Data.IOFlags
+---@return string|nil fmt
+---@return string|nil err
+local function register_format(flags)
+  local register = require("data.scope.register")
+  local name, nerr = register.name(flags.reg)
+  if not name then
+    return nil, nerr or "invalid --reg"
+  end
+  local lines, rerr = register.read(name)
+  if not lines then
+    return nil, rerr
+  end
+  local fmt = M.from_text(table.concat(lines, "\n"))
+  if fmt then
+    return fmt, nil
+  end
+  return nil,
+    ("could not determine a format from register '%s' -- use :JSON/:YAML/:XML directly"):format(
+      name
+    )
+end
+
 --- Guess `bufnr`'s data.nvim format for a `:Data` invocation.
 ---@param bufnr integer
 ---@param cmd Lib.UserCommand.Args
+---@param flags? Data.IOFlags
 ---@return string|nil fmt
 ---@return string|nil err
-function M.format(bufnr, cmd)
+function M.format(bufnr, cmd, flags)
+  if flags and flags.reg ~= nil and flags.reg ~= false then
+    return register_format(flags)
+  end
+
   if
     not (cmd.range and cmd.range > 0)
     and require("data.config").get("fenced_scope.enable") ~= false

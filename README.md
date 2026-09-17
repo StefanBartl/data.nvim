@@ -26,6 +26,10 @@ Format and filter structured data (JSON, YAML, XML) in place, in the buffer or a
 visual selection — `pretty`, `compact` (JSON/XML), `lines` to flatten nested keys
 onto one `path: value` per line, `keys` for just the paths.
 
+Or without touching the buffer at all: `:JSON pretty --reg=+` formats whatever
+you last copied into a scratch split, and `--inplace`/`--split`/`--out-reg`
+say where any result should go.
+
 ## Table of contents
 
 - [Documentation](#documentation)

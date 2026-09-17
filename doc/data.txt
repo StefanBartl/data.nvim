@@ -18,7 +18,9 @@ CONTENTS                                                        *data-contents*
 
 data.nvim reformats structured data (JSON, YAML, XML) in place, either the
 whole buffer or a Visual selection: pretty-print, collapse to one line
-(JSON/XML), or flatten nested keys onto one `path: value` line each.
+(JSON/XML), or flatten nested keys onto one `path: value` line each. The
+input can also come from a register instead of the buffer, and the result
+can go to a scratch split or another register -- see |data-scope|.
 
 Requires Neovim 0.9+ and `lib.nvim` (hard dependency).
 
@@ -57,11 +59,37 @@ explicit `:N,M` range acts only on those lines.
     to json                        :YAML only: convert the scope to JSON
     filter [--sep=X]                interactively filter path/value entries (needs pickers.nvim)
 
+                                            *data-flags* *:JSON---reg* *:JSON---split*
+Every action of every verb additionally accepts four source/target flags:
+
+    --reg[=<name>]                 read the input from a register instead of
+                                    the buffer (bare form: `register.default`)
+    --inplace                      write the result over the buffer scope
+    --split                        write the result to a scratch split
+    --out-reg[=<name>]             write the result into a register
+
+The defaults follow the source: a buffer or Visual scope replaces itself,
+a register source opens a split. So `:JSON pretty --reg=+` formats the
+system clipboard into a new split and never touches the current buffer.
+
+The three target flags are mutually exclusive. `--reg --inplace` also
+requires an explicit range or Visual selection -- without one, "in place"
+would mean the whole buffer, and replacing a whole file with register
+contents should not be possible by accident. `--out-reg` refuses Vim's
+read-only registers (`:` `.` `%` `#` `=`) by name, and reports how many
+lines it wrote, since a register write is otherwise invisible.
+
+A read-only buffer is still a valid source for `--split`/`--out-reg`; only
+the in-place write needs 'modifiable'.
+
+Bare `:JSON`/`:YAML`/`:XML`/`:Data` (no action) stays whole-buffer, in-place
+pretty-printing -- flags need an explicit action, e.g. `:JSON pretty --split`.
+
 :Data offers pretty/lines/keys/sort/filter with the format auto-detected
-(fenced block under the cursor, else the buffer's 'filetype') instead of
-named by the command -- no compact/ndjson/to, since those already require
-knowing the format. A clear error, not a guess, when neither signal maps to
-json/yaml/xml.
+(fenced block under the cursor, the register's own first non-blank line
+under `--reg`, else the buffer's 'filetype') instead of named by the
+command -- no compact/ndjson/to, since those already require knowing the
+format. A clear error, not a guess, when no signal maps to json/yaml/xml.
 
 `sort` and `pretty` are currently identical output for all three formats:
 neither JSON's nor YAML's decoder preserves the source's original key order
@@ -94,6 +122,12 @@ Full cheatsheet (including `<Tab>` completion behavior): docs/BINDINGS.md.
       fenced_scope = {
         enable = true, -- see |data-integrations|
       },
+      register = {
+        default = "+", -- register a bare --reg / --out-reg uses
+      },
+      target = {
+        split = "right", -- where --split opens: above|below|left|right|auto
+      },
       keymaps = {
         preset = false, -- reserved; no default keymap preset exists yet
       },
@@ -101,6 +135,14 @@ Full cheatsheet (including `<Tab>` completion behavior): docs/BINDINGS.md.
 <
 `indent`/`sep` are also overridable per invocation (`:JSON pretty 4`,
 `:YAML lines --sep=/`) — the config values are only the fallback.
+
+`register.default` is what a bare `--reg`/`--out-reg` resolves to; `+` is
+the system clipboard. On a Neovim with no clipboard provider a BARE `--reg`
+falls back to `"` and says so, while an explicitly typed `--reg=+` is left
+alone and fails with the ordinary "register is empty" message instead.
+`target.split` picks the direction `--split` opens in; "auto" (or anything
+that is not one of the four directions) honors your own 'splitbelow'/
+'splitright'.
 
 ==============================================================================
 5. SCOPE                                                            *data-scope*
@@ -110,17 +152,22 @@ Full cheatsheet (including `<Tab>` completion behavior): docs/BINDINGS.md.
   - Otherwise, with the cursor inside a matching fenced code block and
     color_my_ascii.nvim installed -> that block's interior (|data-integrations|).
   - Otherwise -> the whole current buffer.
-  - Register scope (`--reg=`, output to a scratch split instead of the
-    buffer) is designed but not implemented yet -- see docs/scope.md in the
-    repository.
+  - `--reg[=<name>]` replaces all of the above as the INPUT: the buffer is
+    not read at all, and a range (if any) then only says where an
+    `--inplace` result would go. See |data-flags|.
+
+Where the result goes is a separate decision from where the input came
+from: `--inplace`, `--split`, `--out-reg[=<name>]`, defaulting to whichever
+matches the source. See |data-flags|.
 
 ==============================================================================
 6. HEALTH                                                          *data-health*
 
 `:checkhealth data` reports Neovim version, whether `lib.nvim` is installed
 (required), and whether it ships `lib.lua.tables.path_flatten` (required by
-`lines`/`keys`), `lib.lua.yaml.encode` (required by `:YAML`), and
-`lib.lua.xml` (required by `:XML`).
+`lines`/`keys`), `lib.lua.yaml.encode` (required by `:YAML`),
+`lib.lua.xml` (required by `:XML`), and `lib.nvim.window.open_scratch_split`
+(required by `--split`).
 
 ==============================================================================
 7. LIB.NVIM INTEGRATION                                               *data-lib*
