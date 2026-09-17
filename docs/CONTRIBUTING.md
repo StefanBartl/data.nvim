@@ -22,11 +22,21 @@ the preview specs in `preview_spec.lua`. See
 **A skipped spec still reports "Success".** Plenary has no "skipped" outcome,
 so a describe that registers zero tests is invisible in the output — if you are
 working on one of those integrations, check that its `it`s actually appear in
-the run rather than trusting the green line at the bottom.
+the run rather than trusting the green line at the bottom. Each of those three
+specs now has a counterpart that runs everywhere against a double
+(`filter_failure_spec.lua`, `preview_failure_spec.lua`,
+`filter_lifecycle_spec.lua`), so the green line is not the only thing standing
+behind those code paths.
+
+[`TESTS/README.md`](../TESTS/README.md) is the register of what the suite
+covers, what it deliberately leaves out and why, and which known defects are
+pinned with a `BUG:`-marked assertion rather than fixed. Read it before adding
+a spec, and update it when you do.
 
 ## Style
 
-`stylua --check .` and `luacheck lua TESTS` must be clean before a PR. Both configs
+`stylua --check .` and `luacheck .` must be clean before a PR — exactly the two
+commands CI runs, and both cover `TESTS/` as well as `lua/`. Both configs
 (`stylua.toml`, `.luacheckrc`) are in the repo root.
 
 ## Adding a format

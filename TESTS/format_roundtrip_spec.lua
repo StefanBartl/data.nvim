@@ -67,6 +67,59 @@ describe("data.format.yaml round-trip (decode -> pretty render -> decode)", func
   end
 end)
 
+describe("BUG: the JSON round-trip above cannot see an empty object becoming an array", function()
+  -- `assert.same` compares table CONTENTS, and an empty object and an empty
+  -- array have identical (that is, no) contents in Lua. Fixture 3 above
+  -- (`{"empty_obj":{},"empty_arr":[]}`) therefore passes while the document's
+  -- shape is in fact being changed -- exactly the class of bug the round-trip
+  -- invariant was written to catch, slipping through its equality relation.
+  --
+  -- The distinction is NOT lost information: `vim.json.decode` marks an empty
+  -- object with `vim.empty_dict()`'s metatable and leaves an empty array
+  -- plain, and `lib.nvim.json.decode`'s null normalization carries that
+  -- metatable through. `lib.lua.json.encode` then ignores it and writes `[]`
+  -- for both -- so `:JSON pretty` on a config file silently rewrites every
+  -- empty object as an empty array, which for most consumers of that file is
+  -- a type change and not a formatting change. The defect is in lib.nvim's
+  -- encoder; this pins the consequence at data.nvim's own surface.
+
+  it("decode keeps the two apart", function()
+    local value = json_fmt.decode('{"o":{},"a":[]}')
+    assert.is_not_nil(getmetatable(value.o), "an empty object carries vim.empty_dict's metatable")
+    assert.is_nil(getmetatable(value.a), "an empty array carries none")
+  end)
+
+  it("BUG: compact render collapses both onto []", function()
+    local value = json_fmt.decode('{"o":{},"a":[]}')
+    assert.same(
+      { '{"a":[],"o":[]}' },
+      json_fmt.render(value, "compact"),
+      "BUG: `o` became an array"
+    )
+  end)
+
+  it("BUG: so the round trip preserves the contents but not the shape", function()
+    local value1 = json_fmt.decode('{"o":{},"a":[]}')
+    local value2 = json_fmt.decode((json_fmt.render(value1, "compact"))[1])
+    assert.same(value1, value2, "contents match, which is why the fixture above passes")
+    assert.is_not_nil(getmetatable(value1.o))
+    assert.is_nil(getmetatable(value2.o), "BUG: the empty object did not survive the round trip")
+  end)
+
+  it("BUG: and `lines` labels an empty object leaf as an array, unlike yaml", function()
+    -- `data.format.yaml`'s own `display` deliberately special-cases an empty
+    -- table to `{}` rather than letting the encoder decide. `format/json.lua`
+    -- does not, so the two sibling helpers disagree about the same value.
+    local value = json_fmt.decode('{"o":{}}')
+    assert.same({ "o: []" }, json_fmt.render(value, "lines"), "BUG: an object shown as an array")
+    assert.same(
+      { "o: {}" },
+      yaml_fmt.render({ o = {} }, "lines"),
+      "yaml says {} for the same value"
+    )
+  end)
+end)
+
 describe("data.format.xml round-trip (decode -> compact render -> decode)", function()
   local fixtures = {
     '<user id="1"><name>Ana</name></user>',
