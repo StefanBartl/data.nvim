@@ -100,6 +100,33 @@ describe("data.scope.register.read", function()
     assert.equals(0, vim.g.data_nvim_expr_probe, "refused before anything was evaluated")
   end)
 
+  it("refuses a non-string register value instead of calling tostring on it", function()
+    -- Defensive, and honestly labelled as such: no register reachable through
+    -- `setreg` produces this -- a NUL byte is rejected by `setreg` itself with
+    -- E976, so `getreg` never hands back a Blob by that route. The guard
+    -- exists because the previous code's `tostring(text)` fallback would
+    -- raise on any non-string, escaping as a raw Vim error from inside a
+    -- usercmd handler. Stubbed rather than provoked, so the test says what it
+    -- actually covers.
+    local orig = vim.fn.getreg
+    --- Test double: restored immediately below.
+    ---@diagnostic disable-next-line: duplicate-set-field
+    vim.fn.getreg = function()
+      return setmetatable({}, {
+        __tostring = function()
+          error("Vim:E976: Using a Blob as a String")
+        end,
+      })
+    end
+    local lines, err = register.read("a")
+    vim.fn.getreg = orig
+
+    ---@diagnostic disable-next-line: undefined-field
+    assert.is_nil(lines)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.is_truthy(err:find("binary data", 1, true))
+  end)
+
   it("reads a charwise register as a single line", function()
     vim.fn.setreg("a", '{"a":1}', "c")
     local lines = register.read("a")

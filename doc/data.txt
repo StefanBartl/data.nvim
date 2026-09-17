@@ -114,6 +114,11 @@ under `--reg`, else the buffer's 'filetype') instead of named by the
 command -- no compact/ndjson/to, since those already require knowing the
 format. A clear error, not a guess, when no signal maps to json/yaml/xml.
 
+`lines`/`keys` render exactly one line per leaf, so control characters in a
+value are escaped: a newline as \n, a tab as \t, anything else in C0 as \xNN.
+Backslashes are deliberately NOT escaped, so a Windows path stays readable --
+`lines` is a human-readable summary, not JSON to parse back.
+
 `sort` and `pretty` are currently identical output for all three formats:
 neither JSON's nor YAML's decoder preserves the source's original key order
 and both encoders sort keys by default; XML's encoder always sorts

@@ -122,7 +122,18 @@ local function write_inplace(source, lines)
   if not vim.bo[bufnr].modifiable then
     return false, { msg = "buffer is not modifiable", level = "error" }
   end
-  vim.api.nvim_buf_set_lines(bufnr, source.s0, (source.e0 or 0) + 1, false, lines)
+  -- Guarded because `nvim_buf_set_lines` has input conditions of its own --
+  -- it rejects an item containing a newline, for one. A renderer is supposed
+  -- to have made that impossible (see `data.util.oneline`), and one of them
+  -- once did not: the failure surfaced as a Lua error naming this file and
+  -- line rather than as anything a user could act on. Belt to that
+  -- suspenders, in the same spirit as `data.util.safe_call` around decode.
+  local ok, err =
+    pcall(vim.api.nvim_buf_set_lines, bufnr, source.s0, (source.e0 or 0) + 1, false, lines)
+  if not ok then
+    return false,
+      { msg = ("could not write the result: %s"):format(tostring(err)), level = "error" }
+  end
   return true, nil
 end
 

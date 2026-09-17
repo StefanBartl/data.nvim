@@ -8,6 +8,7 @@ local json = require("lib.nvim.json")
 local json_encode = require("lib.lua.json.encode")
 local tables = require("lib.lua.tables")
 local null = require("lib.lua.null")
+local oneline = require("data.util.oneline")
 
 local M = {}
 
@@ -27,10 +28,10 @@ local function display(v)
   end
   local t = type(v)
   if t == "string" then
-    return v
+    return oneline.escape(v)
   end
   if t == "table" then
-    return (json_encode(v)) or vim.inspect(v)
+    return oneline.escape((json_encode(v)) or vim.inspect(v))
   end
   return tostring(v)
 end

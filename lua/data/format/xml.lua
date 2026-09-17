@@ -11,6 +11,7 @@
 --- guessing a schema-dependent mapping (see docs/architecture.md).
 
 local xml = require("lib.lua.xml")
+local oneline = require("data.util.oneline")
 local tables = require("lib.lua.tables")
 
 local M = {}
@@ -26,10 +27,10 @@ local M = {}
 ---@return string
 local function display(v)
   if type(v) == "string" then
-    return v
+    return oneline.escape(v)
   end
   if type(v) == "table" then
-    return vim.inspect(v)
+    return oneline.escape(vim.inspect(v))
   end
   return tostring(v)
 end

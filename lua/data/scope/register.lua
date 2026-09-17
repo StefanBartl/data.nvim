@@ -131,7 +131,11 @@ function M.read(name)
     return nil, ("could not read register '%s': %s"):format(name, tostring(text))
   end
   if type(text) ~= "string" then
-    text = tostring(text)
+    -- A register holding a NUL byte comes back as a Blob, not a string, and
+    -- `tostring` on one raises E976 -- which used to escape this module as a
+    -- raw Vim error from inside a usercmd handler. There is nothing sensible
+    -- to decode in binary anyway, so it is named and refused.
+    return nil, ("register '%s' holds binary data, not text -- nothing to decode"):format(name)
   end
   if not text:find("%S") then
     return nil, ("register '%s' is empty"):format(name)

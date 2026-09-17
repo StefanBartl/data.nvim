@@ -331,7 +331,6 @@ function M.run(fmt, mode, cmd, opts, flags)
     notify.error(("%s render failed: %s"):format(fmt:upper(), rerr))
     return
   end
-
   deliver(sink, source, out, fmt, mode)
 end
 

@@ -88,6 +88,15 @@ first. Its `'filetype'` is the result's format (`json`/`yaml`/`xml`), except
 for `lines`/`keys`/`filter`, whose flattened `path: value` text is not a
 document in any of the three.
 
+**`lines`/`keys` render exactly one line per leaf**, so control characters in a
+value are escaped: a newline shows as `\n`, a tab as `\t`, anything else in C0
+as `\xNN`. That matters more than it sounds — the `message`, `error` and
+`stack` fields of a support log are multi-line more often than not, and
+without the escape a two-leaf document either failed to write at all or
+arrived in a register as three lines. Backslashes are deliberately *not*
+escaped, so a Windows path stays readable as `C:\Users\me`; `lines` is a
+human-readable summary, not JSON to be parsed back.
+
 **`sort` vs `pretty`:** identical output today, for all three formats. Neither
 JSON's nor YAML's decoder preserves the source's original key order, and both
 encoders sort object keys by default; XML's encoder always sorts attribute names

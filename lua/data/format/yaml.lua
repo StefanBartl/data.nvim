@@ -10,6 +10,7 @@
 --- representation this decoder cannot read back.
 
 local yaml = require("lib.lua.yaml")
+local oneline = require("data.util.oneline")
 local tables = require("lib.lua.tables")
 local null = require("lib.lua.null")
 
@@ -28,7 +29,7 @@ local function display(v)
   end
   local t = type(v)
   if t == "string" then
-    return v
+    return oneline.escape(v)
   end
   if t == "table" then
     if next(v) == nil then
@@ -38,7 +39,7 @@ local function display(v)
       -- indistinguishable from an actual empty-string leaf value.
       return "{}"
     end
-    return (yaml.encode(v)) or vim.inspect(v)
+    return oneline.escape((yaml.encode(v)) or vim.inspect(v))
   end
   return tostring(v)
 end
