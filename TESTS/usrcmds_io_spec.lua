@@ -299,6 +299,28 @@ describe("data.detect.from_text", function()
     assert.equals("yaml", detect.from_text("user: ana"))
   end)
 
+  it("stays linear on a long blank first line", function()
+    -- Regression: the first non-blank line used to be found with
+    -- `[^\r\n]*%S[^\r\n]*`. That pattern cannot cross a newline, so on a
+    -- whitespace-only first line it scanned the whole run, backtracked for a
+    -- `%S` that was not there, and restarted one byte along -- O(n^2), 876 ms
+    -- at 16k spaces and a frozen editor well before a register gets large.
+    -- The bound below is ~1000x the linear cost and ~1/600th of the old
+    -- quadratic one, so it separates the two without being timing-sensitive.
+    local text = string.rep(" ", 200000) .. "\n" .. '{"a":1}'
+    local started = vim.loop.hrtime()
+    local fmt = detect.from_text(text)
+    local elapsed_ms = (vim.loop.hrtime() - started) / 1e6
+
+    ---@diagnostic disable-next-line: undefined-field
+    assert.equals("json", fmt)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.is_true(
+      elapsed_ms < 200,
+      ("took %.1f ms -- the quadratic scan is back"):format(elapsed_ms)
+    )
+  end)
+
   it("returns nil rather than guessing at prose or an empty string", function()
     ---@diagnostic disable-next-line: undefined-field
     assert.is_nil(detect.from_text("just some prose"))
