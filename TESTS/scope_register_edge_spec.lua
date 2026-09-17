@@ -41,6 +41,33 @@ local function without_clipboard(fn)
   return result
 end
 
+--- The other direction: force `vim.fn.has("clipboard")` to report 1. Some
+--- CI Neovim builds report 0 for it even with no test double installed --
+--- whether *this* machine's Neovim was built with +clipboard is just as
+--- much not something a test may depend on as whether it has a provider,
+--- and the "falls back to +" tests below are about the bare-flag/config
+--- resolution, not about that build flag.
+---@generic T
+---@param fn fun(): T
+---@return T
+local function with_clipboard(fn)
+  local orig = vim.fn.has
+  --- Test double: restored below.
+  ---@diagnostic disable-next-line: duplicate-set-field
+  vim.fn.has = function(what)
+    if what == "clipboard" then
+      return 1
+    end
+    return orig(what)
+  end
+  local ok, result = pcall(fn)
+  vim.fn.has = orig
+  if not ok then
+    error(result, 0)
+  end
+  return result
+end
+
 describe("data.scope.register.name -- the bare-flag forms", function()
   before_each(function()
     package.loaded["data.config"] = nil
@@ -50,9 +77,14 @@ describe("data.scope.register.name -- the bare-flag forms", function()
   it("treats an empty string like a bare flag, not like a register named ''", function()
     -- The composer parses `--reg=` (nothing after the `=`) to `""`, which is
     -- truthy in Lua and would otherwise fail the single-character check.
-    local name, err = register.name("")
-    assert.is_nil(err)
-    assert.equals("+", name, "the configured default")
+    -- Forced to report a clipboard build: this is about the bare-flag
+    -- resolution landing on the configured default, not about the
+    -- no-provider fallback the next describe block covers.
+    with_clipboard(function()
+      local name, err = register.name("")
+      assert.is_nil(err)
+      assert.equals("+", name, "the configured default")
+    end)
   end)
 
   it("resolves false to no register, same as nil", function()
@@ -65,7 +97,9 @@ describe("data.scope.register.name -- the bare-flag forms", function()
   it("falls back to + when the configured default is an empty string", function()
     package.loaded["data.config"] = nil
     require("data.config").setup({ register = { default = "" } })
-    assert.equals("+", register.name(true))
+    with_clipboard(function()
+      assert.equals("+", register.name(true))
+    end)
   end)
 
   it("falls back to + when the configured default is not a string at all", function()
@@ -73,7 +107,9 @@ describe("data.scope.register.name -- the bare-flag forms", function()
     -- wrong type still arrives here.
     package.loaded["data.config"] = nil
     require("data.config").setup({ register = { default = 5 } })
-    assert.equals("+", register.name(true))
+    with_clipboard(function()
+      assert.equals("+", register.name(true))
+    end)
   end)
 
   it("rejects a configured default that is not a single character", function()
