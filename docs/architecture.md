@@ -148,12 +148,35 @@ nothing — the composer's fail-loud stance on undeclared flags doing the work a
 runtime check would otherwise have to.
 
 The preview goes through diff.nvim's public `require("diff").run("key=value …")`
-API with both sides as buffer specifiers, and uses `view=inline`/`float` only:
-diff.nvim's side-by-side renderer materializes the *target* and pairs it with
-whatever buffer the origin window shows, so the left-hand side would be the
-whole data buffer instead of the resolved scope — fine for a whole-buffer
-scope, wrong for a fenced-block or Visual one. The unified-diff views build
-from both resolved sides and are correct for all of them.
+API with both sides as buffer specifiers, and all five `view=` values are
+available — but that is true only since diff.nvim `ff2f424`. Before it, the
+side-by-side renderer materialized the *target* and paired it with whatever
+buffer the origin window showed, so `vsplit`/`split`/`tab` would have put the
+whole data buffer on the left instead of the resolved scope: fine for a
+whole-buffer scope, wrong for a fenced-block or Visual one, and indistinguishable
+from working. data.nvim shipped with those three views locked out for exactly
+that reason; the fix (found from this call site) honours `source=` by giving it
+a scratch buffer and a window of its own, so the lock-out could go. `inline`
+stays the default because nothing here can detect an older diff.nvim.
+
+**data.nvim reads nothing out of what diff.nvim renders, and writes nothing
+into it.** The two sides are handed over as named scratch buffers
+(`data://json filter (before, 3 lines)`), diff.nvim labels a buffer specifier
+by its name, and that label is what lands on the diff's own `---`/`+++`
+header — so the header identifies the sides without data.nvim touching the
+buffer. The first version did touch it: diff.nvim labelled buffer specifiers
+by *number*, so the header read `--- 7` / `+++ 8` directly above a prompt
+asking whether to destroy one of them, and `data.preview` rewrote those two
+lines afterwards. That is the second half of the same diff.nvim fix, and the
+rewrite is gone with it.
+
+Teardown counts windows around the `run()` call rather than inspecting what
+came back. That is the one inference left about diff.nvim's output, and it is
+deliberately the shallowest one available: an earlier version sniffed the
+focused buffer's `'filetype'` for `diff`, which only ever held for the
+unified-diff views — the side-by-side ones leave two ordinary buffers in
+diffmode. New windows are also exactly the handles the teardown needs to close
+again, so one mechanism covers detection and cleanup for all five views.
 
 ### `filter` only pays for the extmark when it needs to
 

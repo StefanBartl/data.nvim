@@ -19,4 +19,6 @@ dependency required for exactly one action, `:JSON`/`:YAML`/`:XML filter`
 ([integrations.md](integrations.md)) — every other command works without it.
 [`diff.nvim`](https://github.com/StefanBartl/diff.nvim) is optional in the same
 way, for exactly one flag: `filter --preview`
-([integrations.md](integrations.md)) — plain `filter` works without it.
+([integrations.md](integrations.md)) — plain `filter` works without it. The
+default `preview.view = "inline"` works with any diff.nvim; the side-by-side
+views need `ff2f424` or newer.

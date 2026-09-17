@@ -23,8 +23,6 @@ describe("data.preview.confirm -- diff.nvim absent", function()
       before = { "a" },
       after = { "b" },
       label = "json filter",
-      before_label = "before",
-      after_label = "after",
       prompt = "?",
     }, function(apply, problem)
       got_apply, got_problem = apply, problem
@@ -86,8 +84,6 @@ describe("data.preview.confirm", function()
       before = { "keep: 1", "drop: 2" },
       after = { "keep: 1" },
       label = "json filter",
-      before_label = "before -- 2 line(s) in scope",
-      after_label = "after -- 1 line(s) kept",
       prompt = "replace?",
     }, function(apply)
       got = apply
@@ -101,7 +97,11 @@ describe("data.preview.confirm", function()
     assert.is_truthy(vim.tbl_contains(seen, " keep: 1"), "the kept line must be visible as context")
   end)
 
-  it("relabels the header so the two sides are identifiable, not buffer numbers", function()
+  it("names the two sides so the diff header identifies them, counts and all", function()
+    -- data.nvim does not touch the rendered diff. The header comes from
+    -- diff.nvim labelling each buffer specifier by its buffer name, so this
+    -- asserts the contract between the holder names and that header -- if
+    -- diff.nvim ever stops labelling by name, this is what catches it.
     local seen
     --- Test double: restored via `orig_select` in `after_each`.
     ---@diagnostic disable-next-line: duplicate-set-field
@@ -111,18 +111,96 @@ describe("data.preview.confirm", function()
     end
 
     require("data.preview").confirm({
-      before = { "a" },
-      after = { "b" },
+      before = { "a", "b", "c" },
+      after = { "a" },
       label = "json filter",
-      before_label = "before -- 1 line(s) in scope",
-      after_label = "after -- 1 line(s) kept",
       prompt = "?",
     }, function() end)
 
     ---@diagnostic disable-next-line: undefined-field
-    assert.equals("--- before -- 1 line(s) in scope", seen[1])
+    assert.equals("--- data://json filter (before, 3 lines)", seen[1])
     ---@diagnostic disable-next-line: undefined-field
-    assert.equals("+++ after -- 1 line(s) kept", seen[2])
+    assert.equals("+++ data://json filter (after, 1 line)", seen[2], "singular at one line")
+  end)
+
+  it("tears down every window it opened, for a side-by-side view too", function()
+    -- The unified-diff views open one window, the side-by-side ones open two
+    -- (diff.nvim materializes the source into its own buffer since ff2f424).
+    -- Counting windows around the call is what makes one teardown cover both.
+    for _, view in ipairs({ "inline", "float", "vsplit", "split" }) do
+      package.loaded["data.config"] = nil
+      require("data.config").setup({ preview = { view = view } })
+
+      local wins, bufs = #vim.api.nvim_list_wins(), #vim.api.nvim_list_bufs()
+      --- Test double: restored via `orig_select` in `after_each`.
+      ---@diagnostic disable-next-line: duplicate-set-field
+      vim.ui.select = function(_choices, _opts, cb)
+        cb("Discard")
+      end
+
+      require("data.preview").confirm({
+        before = { "keep: 1", "drop: 2" },
+        after = { "keep: 1" },
+        label = "json filter",
+        prompt = "?",
+      }, function() end)
+
+      ---@diagnostic disable-next-line: undefined-field
+      assert.equals(
+        wins,
+        #vim.api.nvim_list_wins(),
+        ("no window left behind by view=%s"):format(view)
+      )
+      ---@diagnostic disable-next-line: undefined-field
+      assert.equals(
+        bufs,
+        #vim.api.nvim_list_bufs(),
+        ("no buffer left behind by view=%s"):format(view)
+      )
+    end
+  end)
+
+  it("puts the resolved source on the left, not the buffer that happened to be current", function()
+    -- The bug that kept the side-by-side views out of `preview.view` until
+    -- diff.nvim ff2f424: `source=` was resolved and then dropped, so the left
+    -- pane showed whatever the origin window held. Against an older diff.nvim
+    -- this fails, which is exactly what it is for.
+    package.loaded["data.config"] = nil
+    require("data.config").setup({ preview = { view = "vsplit" } })
+
+    local foreign = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_lines(foreign, 0, -1, false, { "FOREIGN ORIGIN BUFFER" })
+    vim.api.nvim_set_current_buf(foreign)
+
+    local first_lines
+    --- Test double: restored via `orig_select` in `after_each`.
+    ---@diagnostic disable-next-line: duplicate-set-field
+    vim.ui.select = function(_choices, _opts, cb)
+      first_lines = {}
+      for _, win in ipairs(vim.api.nvim_list_wins()) do
+        if vim.wo[win].diff then
+          local b = vim.api.nvim_win_get_buf(win)
+          first_lines[#first_lines + 1] = vim.api.nvim_buf_get_lines(b, 0, 1, false)[1]
+        end
+      end
+      cb("Discard")
+    end
+
+    require("data.preview").confirm({
+      before = { "keep: 1", "drop: 2" },
+      after = { "keep: 1" },
+      label = "json filter",
+      prompt = "?",
+    }, function() end)
+
+    vim.api.nvim_buf_delete(foreign, { force = true })
+
+    ---@diagnostic disable-next-line: undefined-field
+    assert.equals(2, #first_lines, "both sides of a side-by-side diff are in diffmode")
+    for _, line in ipairs(first_lines) do
+      ---@diagnostic disable-next-line: undefined-field
+      assert.are_not.equals("FOREIGN ORIGIN BUFFER", line)
+    end
   end)
 
   it("reports 'Discard' and a cancelled prompt alike as a no", function()
@@ -160,8 +238,6 @@ describe("data.preview.confirm", function()
       before = { "a", "b", "c" },
       after = { "a" },
       label = "json filter",
-      before_label = "before",
-      after_label = "after",
       prompt = "?",
     }, function() end)
 

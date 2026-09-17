@@ -147,7 +147,7 @@ Full cheatsheet (including `<Tab>` completion behavior): docs/BINDINGS.md.
       },
       preview = {
         filter = false,  -- diff before an in-place `filter` replaces the scope
-        view = "inline", -- diff.nvim view for it: "inline" or "float"
+        view = "inline", -- inline|float|vsplit|split|tab
       },
       keymaps = {
         preset = false, -- reserved; no default keymap preset exists yet
@@ -164,8 +164,11 @@ alone and fails with the ordinary "register is empty" message instead.
 `target.split` picks the direction `--split` opens in; "auto" (or anything
 that is not one of the four directions) honors your own 'splitbelow'/
 'splitright'. `preview.filter` makes |data-preview| the default for every
-in-place `filter`; `preview.view` picks "inline" (a split) or "float" --
-side-by-side views are deliberately not offered, see docs/integrations.md.
+in-place `filter`; `preview.view` takes any of diff.nvim's five views. The
+side-by-side three ("vsplit"/"split"/"tab") need diff.nvim ff2f424 or newer --
+before it, `:Diff` ignored `source=` for those views and put the wrong buffer
+on the left. Nothing here can detect an older diff.nvim, so "inline" is the
+default. See docs/integrations.md.
 
 ==============================================================================
 5. SCOPE                                                            *data-scope*

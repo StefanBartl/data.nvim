@@ -78,9 +78,17 @@ afterwards and there is nothing to preview against — `--preview` alongside one
 of those says so rather than doing nothing quietly.
 
 data.nvim calls diff.nvim's public `require("diff").run("key=value …")` API with
-the two sides as buffer specifiers and `view=inline`. Side-by-side views
-(`vsplit`/`split`/`tab`) are deliberately **not** offered: diff.nvim's
-side-by-side renderer materializes only the *target* and pairs it with whatever
-buffer the origin window is showing, so the left-hand side would be the whole
-data buffer rather than the resolved scope — wrong for a fenced-block or Visual
-scope. `preview.view` picks between `inline` (a split) and `float`.
+the two sides as named scratch buffers. `preview.view` picks any of diff.nvim's
+five views — `inline` (default, a split with the unified diff), `float`, or the
+side-by-side `vsplit`/`split`/`tab`.
+
+**The side-by-side three need diff.nvim `ff2f424` or newer.** Before that
+commit, `:Diff` resolved `source=` and then ignored it for those views, pairing
+the target with whatever buffer the origin window happened to be showing — so
+the left-hand pane would be the whole data buffer instead of the resolved
+scope, wrong for a fenced-block or Visual scope and indistinguishable from
+working. The bug was found from this call site and fixed in diff.nvim; nothing
+here can detect an older version, which is why `inline` is the default. The
+same fix made diff.nvim label a buffer specifier by name rather than by number,
+which is why the diff's header reads
+`--- data://json filter (before, 3 lines)` instead of `--- 7`.

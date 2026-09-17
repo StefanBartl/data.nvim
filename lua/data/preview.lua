@@ -23,16 +23,17 @@
 local M = {}
 
 ---@internal
---- `diff.nvim` view values this can use. `vsplit`/`split`/`tab` are NOT
---- offered, and the reason is a real constraint rather than a preference:
---- diff.nvim's side-by-side renderer materializes only the *target* into a
---- scratch buffer and pairs it with whatever buffer the origin window is
---- showing (`diff.core.render.side_by_side`), so the left-hand side would be
---- the whole data buffer rather than the resolved scope -- for a fenced-block
---- or Visual scope, the wrong thing entirely. `inline`/`float` render a
---- unified diff from both resolved sides, which is what this needs.
+--- `diff.nvim` view values `preview.view` accepts. All five, but only since
+--- diff.nvim `ff2f424`: before that, its side-by-side renderer materialized
+--- only the *target* and paired it with whatever buffer the origin window
+--- happened to be showing, so `vsplit`/`split`/`tab` would have put the whole
+--- data buffer on the left instead of the resolved scope -- for a
+--- fenced-block or Visual scope, the wrong thing entirely, while looking
+--- exactly like it had worked. An older diff.nvim therefore renders those
+--- three views wrongly; `:checkhealth data` cannot detect the difference, so
+--- `inline` stays the default.
 ---@type table<string, true>
-local VIEWS = { inline = true, float = true }
+local VIEWS = { inline = true, float = true, vsplit = true, split = true, tab = true }
 
 --- Whether a preview can be rendered at all.
 ---@return boolean
@@ -42,69 +43,53 @@ end
 
 ---@internal
 --- An unlisted scratch buffer holding `lines`, for diff.nvim to resolve a
---- `source=`/`target=` buffer specifier against. Named only for hygiene while
---- it briefly exists; diff.nvim labels a buffer specifier by its number, not
---- its name.
+--- `source=`/`target=` buffer specifier against.
+---
+--- The name is load-bearing, not hygiene: diff.nvim labels a buffer specifier
+--- by the buffer's name, and that label is what ends up on the `---`/`+++`
+--- lines of the rendered diff -- directly above a prompt asking whether to
+--- destroy one of the two sides. So the name carries the side AND its line
+--- count, and the header reads itself.
 ---@param lines string[]
----@param name string
+---@param label string # the action, e.g. "json filter"
+---@param side string  # "before" | "after"
 ---@return integer bufnr
-local function holder(lines, name)
+local function holder(lines, label, side)
   local bufnr = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
-  pcall(vim.api.nvim_buf_set_name, bufnr, name)
+  pcall(
+    vim.api.nvim_buf_set_name,
+    bufnr,
+    ("data://%s (%s, %d line%s)"):format(label, side, #lines, #lines == 1 and "" or "s")
+  )
   return bufnr
 end
 
 ---@internal
---- Replace the `--- <label>` / `+++ <label>` pair diff.nvim writes at the top
---- of a unified-diff buffer with something a person can act on.
+--- The windows diff.nvim opened for the preview, if it opened any.
 ---
---- Cosmetic only, and guarded so it can never damage the preview: diff.nvim
---- labels a buffer specifier by its buffer *number*, so the header reads
---- `--- 7` / `+++ 8` -- two numbers that say nothing about which side is
---- which, in front of a prompt asking whether to destroy one of them. There
---- is no label option in diff.nvim's `key=value` grammar to pass instead. If
---- the first two lines don't look like that header (a future diff.nvim
---- changes its shape), they are left exactly as they are and the preview is
---- still perfectly usable, just labelled by number.
----@param bufnr integer
----@param before_label string
----@param after_label string
----@return nil
-local function relabel(bufnr, before_label, after_label)
-  local head = vim.api.nvim_buf_get_lines(bufnr, 0, 2, false)
-  if #head < 2 or not head[1]:match("^%-%-%- ") or not head[2]:match("^%+%+%+ ") then
-    return
-  end
-  local modifiable = vim.bo[bufnr].modifiable
-  vim.bo[bufnr].modifiable = true
-  pcall(vim.api.nvim_buf_set_lines, bufnr, 0, 2, false, {
-    "--- " .. before_label,
-    "+++ " .. after_label,
-  })
-  vim.bo[bufnr].modifiable = modifiable
-end
-
----@internal
---- The buffer diff.nvim just rendered the preview into, if it did.
+--- `diff.run` returns nothing and there is no handle to ask, so this diffs
+--- the window list around the call. That is deliberately the *only* thing
+--- this module infers about diff.nvim's output: an earlier version sniffed
+--- the focused buffer's `'filetype'` for "diff", which only ever held for
+--- the unified-diff views -- the side-by-side ones leave two ordinary
+--- buffers in diffmode behind. Counting new windows covers all five views,
+--- needs to know nothing about what diff.nvim puts in them, and gives the
+--- teardown exactly the handles it has to close again.
 ---
---- `diff.run` returns nothing and there is no handle to ask, so this reads
---- the window it leaves focused -- `inline` and `float` both end by entering
---- the new diff buffer. Every condition below has to hold for that to be what
---- we're looking at, so a diff.nvim that rendered nothing (an internal error,
---- or a version that stops focusing the result) is detected as "no preview"
---- rather than mistaken for one.
----@param exclude table<integer, true> # buffers that were ours going in
----@return integer|nil
-local function rendered_buffer(exclude)
-  local bufnr = vim.api.nvim_get_current_buf()
-  if exclude[bufnr] or not vim.api.nvim_buf_is_valid(bufnr) then
-    return nil
+--- Zero new windows means diff.nvim rendered nothing (an internal error, or
+--- two sides it considered identical), which the caller must treat as "no
+--- preview" rather than as consent.
+---@param before table<integer, true> # window ids that existed going in
+---@return integer[]
+local function opened_windows(before)
+  local out = {}
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if not before[win] then
+      out[#out + 1] = win
+    end
   end
-  if vim.bo[bufnr].filetype ~= "diff" then
-    return nil
-  end
-  return bufnr
+  return out
 end
 
 --- Show `before` vs `after` and ask whether to apply.
@@ -131,8 +116,8 @@ function M.confirm(opts, on_decision)
     view = "inline"
   end
 
-  local before_buf = holder(opts.before, ("data://%s (before)"):format(opts.label))
-  local after_buf = holder(opts.after, ("data://%s (after)"):format(opts.label))
+  local before_buf = holder(opts.before, opts.label, "before")
+  local after_buf = holder(opts.after, opts.label, "after")
 
   local function drop_holders()
     for _, b in ipairs({ before_buf, after_buf }) do
@@ -142,6 +127,11 @@ function M.confirm(opts, on_decision)
     end
   end
 
+  local wins_before = {}
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    wins_before[win] = true
+  end
+
   -- Everything below reaches into a third-party plugin; a failure there has
   -- to come back as a refusal to write, not as an error raised past an async
   -- callback of ours.
@@ -149,14 +139,15 @@ function M.confirm(opts, on_decision)
     diff.run,
     ("source=%d target=%d view=%s output=buffer"):format(before_buf, after_buf, view)
   )
-  local preview_buf = ran and rendered_buffer({ [before_buf] = true, [after_buf] = true }) or nil
+  local preview_wins = ran and opened_windows(wins_before) or {}
 
   -- Both sides are read during `diff.run` itself (a buffer specifier resolves
   -- synchronously), so the holders have done their job by now whatever the
-  -- outcome.
+  -- outcome. diff.nvim copies whatever it needs into scratch buffers of its
+  -- own, so deleting these does not empty the preview.
   drop_holders()
 
-  if not preview_buf then
+  if #preview_wins == 0 then
     on_decision(nil, {
       msg = "diff.nvim did not render a preview -- nothing was written",
       level = "error",
@@ -164,15 +155,18 @@ function M.confirm(opts, on_decision)
     return
   end
 
-  relabel(preview_buf, opts.before_label, opts.after_label)
-  local preview_win = vim.api.nvim_get_current_win()
-
   local function close_preview()
-    if vim.api.nvim_win_is_valid(preview_win) then
-      pcall(vim.api.nvim_win_close, preview_win, true)
-    end
-    if vim.api.nvim_buf_is_valid(preview_buf) then
-      pcall(vim.api.nvim_buf_delete, preview_buf, { force = true })
+    for _, win in ipairs(preview_wins) do
+      if vim.api.nvim_win_is_valid(win) then
+        local bufnr = vim.api.nvim_win_get_buf(win)
+        -- The last window of the last tabpage cannot be closed; pcall rather
+        -- than a special case, since the preview is torn down either way and
+        -- a stuck window is not worth failing the decision over.
+        pcall(vim.api.nvim_win_close, win, true)
+        if vim.api.nvim_buf_is_valid(bufnr) then
+          pcall(vim.api.nvim_buf_delete, bufnr, { force = true })
+        end
+      end
     end
   end
 

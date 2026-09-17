@@ -40,8 +40,9 @@
 --- whether to apply it. Default false; `--preview`/`--no-preview` override
 --- it per invocation. Requires diff.nvim (see data.preview).
 ---@field filter boolean
---- diff.nvim `view=` for that preview: "inline" (a split) or "float".
---- Side-by-side views are deliberately not offered -- see data.preview.
+--- diff.nvim `view=` for that preview: "inline", "float", "vsplit", "split"
+--- or "tab". The side-by-side three need diff.nvim ff2f424 or newer to show
+--- the right left-hand side -- see data.preview.
 ---@field view string
 
 ---@class DataKeymapsConfig
@@ -114,12 +115,10 @@
 
 --- One before/after preview, as `data.preview.confirm` takes it.
 ---@class Data.PreviewOpts
----@field before string[]      # the scope as it stands now
----@field after string[]       # what the action would replace it with
----@field label string         # short action name for the holder buffers, e.g. "json filter"
----@field before_label string  # left-hand header line of the rendered diff
----@field after_label string   # right-hand header line
----@field prompt string        # the `vim.ui.select` prompt
+---@field before string[] # the scope as it stands now
+---@field after string[]  # what the action would replace it with
+---@field label string    # short action name, e.g. "json filter" -- becomes both holder buffer names, and through them the rendered diff's own `---`/`+++` header
+---@field prompt string   # the `vim.ui.select` prompt
 
 ---@class Data.SinkWriteOpts
 ---@field filetype? string # 'filetype' for a `--split` scratch buffer; nil when the output isn't in the source format (`lines`/`keys`/`filter`)

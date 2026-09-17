@@ -511,8 +511,6 @@ function M.filter(fmt, cmd, opts, flags)
       before = before,
       after = out,
       label = ("%s filter"):format(fmt),
-      before_label = ("before -- %d line(s) in scope"):format(#before),
-      after_label = ("after -- %d line(s) kept"):format(#out),
       prompt = ("%s filter: replace %d line(s) with %d?"):format(fmt:upper(), #before, #out),
     }, function(apply, problem)
       if problem then
