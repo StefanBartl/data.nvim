@@ -207,6 +207,50 @@ describe(":JSON/:YAML/:XML filter", function()
     assert.same({ '{"a":1}' }, lines)
   end)
 
+  it("writes to where the scope MOVED to while the prompt was open", function()
+    -- The one mechanism in this plugin that exists purely because the filter
+    -- prompt is open for an unbounded time: `data.init`'s `M.filter` anchors
+    -- the scope to an extmark rather than to the line numbers it resolved.
+    -- Nothing covered it, so an accidental return to a plain line pair would
+    -- have passed the whole suite while writing the result over the wrong
+    -- lines of a buffer someone had edited meanwhile.
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
+      "HEADER",
+      '{"user":{"id":1},"level":"error"}',
+    })
+
+    local rounds = 0
+    --- Test double: restored via `orig_select` in `after_each`.
+    ---@diagnostic disable-next-line: duplicate-set-field
+    vim.ui.select = function(choices, _select_opts, cb)
+      rounds = rounds + 1
+      if rounds == 1 then
+        -- An edit lands above the scope while the user is still choosing,
+        -- pushing it two lines down.
+        vim.api.nvim_buf_set_lines(bufnr, 0, 0, false, { "INSERTED", "ALSO INSERTED" })
+        for _, c in ipairs(choices) do
+          if c.kind == "add" and c.field == "path" and c.negate == false then
+            return cb(c)
+          end
+        end
+      end
+      cb(nil)
+    end
+    --- Test double: same rationale.
+    ---@diagnostic disable-next-line: duplicate-set-field
+    vim.ui.input = function(_input_opts, cb)
+      cb("user")
+    end
+
+    vim.cmd("2,2JSON filter")
+
+    assert.same(
+      { "INSERTED", "ALSO INSERTED", "HEADER", "user.id: 1" },
+      vim.api.nvim_buf_get_lines(bufnr, 0, -1, false),
+      "the result belongs on the line the scope moved to, not the one it started on"
+    )
+  end)
+
   it(":YAML filter works the same way as :JSON filter", function()
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "user:", "  id: 1", "level: error" })
     script_one_clause("path", "user", false)
