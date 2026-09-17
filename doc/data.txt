@@ -94,7 +94,13 @@ requires an explicit range or Visual selection -- without one, "in place"
 would mean the whole buffer, and replacing a whole file with register
 contents should not be possible by accident. `--out-reg` refuses Vim's
 read-only registers (`:` `.` `%` `#` `=`) by name, and reports how many
-lines it wrote, since a register write is otherwise invisible.
+lines it wrote, since a register write is otherwise invisible. `--reg==` is
+refused too, separately: reading the expression register would EVALUATE its
+contents, and `--reg` should not be the one read that runs code.
+
+Register input is CRLF-normalized -- clipboard text is usually CRLF-terminated
+and a stray carriage return is an artifact, not content. A CR in the middle of
+a line stays.
 
 A read-only buffer is still a valid source for `--split`/`--out-reg`; only
 the in-place write needs 'modifiable'.

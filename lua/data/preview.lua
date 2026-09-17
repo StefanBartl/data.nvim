@@ -80,6 +80,18 @@ end
 --- Zero new windows means diff.nvim rendered nothing (an internal error, or
 --- two sides it considered identical), which the caller must treat as "no
 --- preview" rather than as consent.
+---
+--- **This works because both sides are explicit buffer specifiers**, which
+--- makes diff.nvim materialize both of them into windows of its own and
+--- leave the window the command ran in out of the diff entirely. With
+--- `source=current` it would not: the origin window is then *part* of the
+--- diff without being new, so closing only new windows would leave it in
+--- diffmode. data.nvim never passes `current` -- the whole point is to diff a
+--- resolved scope, not a buffer -- but anyone changing that has to change
+--- this too. (diff.nvim `676934b` added an `on_done` callback reporting the
+--- windows it opened, which would remove this inference; not adopted, because
+--- it would raise the required diff.nvim version for no behavioural gain at
+--- this call shape.)
 ---@param before table<integer, true> # window ids that existed going in
 ---@return integer[]
 local function opened_windows(before)
@@ -156,16 +168,20 @@ function M.confirm(opts, on_decision)
   end
 
   local function close_preview()
+    -- Windows only. Deleting the buffers behind them looked tidier and was a
+    -- data-loss bug: "a window diff.nvim opened" is not the same claim as
+    -- "a buffer diff.nvim created", and a `nvim_buf_delete(..., force = true)`
+    -- on the difference throws away someone's unsaved work. diff.nvim's own
+    -- scratch buffers are `bufhidden = "wipe"`, so closing the window is
+    -- already all the cleanup they need -- and for anything else in one of
+    -- those windows, closing the window is all data.nvim has any business
+    -- doing.
     for _, win in ipairs(preview_wins) do
       if vim.api.nvim_win_is_valid(win) then
-        local bufnr = vim.api.nvim_win_get_buf(win)
         -- The last window of the last tabpage cannot be closed; pcall rather
-        -- than a special case, since the preview is torn down either way and
-        -- a stuck window is not worth failing the decision over.
+        -- than a special case, since a stuck window is not worth failing the
+        -- decision over.
         pcall(vim.api.nvim_win_close, win, true)
-        if vim.api.nvim_buf_is_valid(bufnr) then
-          pcall(vim.api.nvim_buf_delete, bufnr, { force = true })
-        end
       end
     end
   end

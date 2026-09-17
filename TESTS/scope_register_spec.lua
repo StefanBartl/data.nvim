@@ -70,6 +70,36 @@ describe("data.scope.register.read", function()
     assert.same({ "one", "two" }, lines)
   end)
 
+  it("normalizes CRLF, which is how clipboard text arrives on Windows", function()
+    vim.fn.setreg("a", '{\r\n  "x": 1\r\n}', "c")
+    local lines = register.read("a")
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "{", '  "x": 1', "}" }, lines, "no stray CR survives the read")
+  end)
+
+  it("keeps a CR that is not terminating a line", function()
+    -- Only the line-ending artifact goes; a CR inside a line is content.
+    vim.fn.setreg("a", "a\rb\r\nc", "c")
+    local lines = register.read("a")
+    ---@diagnostic disable-next-line: undefined-field
+    assert.same({ "a\rb", "c" }, lines)
+  end)
+
+  it("refuses the expression register, which would evaluate rather than read", function()
+    -- getreg("=") runs the stored expression. Every other register read here
+    -- is side-effect free, and `--reg` reads like one -- so this is a named
+    -- refusal, not a silent evaluation.
+    vim.g.data_nvim_expr_probe = 0
+    vim.fn.setreg("=", 'luaeval("(function() vim.g.data_nvim_expr_probe = 1; return 42 end)()")')
+    local lines, err = register.read("=")
+    ---@diagnostic disable-next-line: undefined-field
+    assert.is_nil(lines)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.is_truthy(err:find("expression register", 1, true))
+    ---@diagnostic disable-next-line: undefined-field
+    assert.equals(0, vim.g.data_nvim_expr_probe, "refused before anything was evaluated")
+  end)
+
   it("reads a charwise register as a single line", function()
     vim.fn.setreg("a", '{"a":1}', "c")
     local lines = register.read("a")

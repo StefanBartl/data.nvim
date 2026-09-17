@@ -59,6 +59,16 @@ has.
 - `--out-reg` refuses Vim's read-only registers (`:`, `.`, `%`, `#`, `=`) by
   name rather than failing inside `setreg`.
 - An empty register is reported (`register '+' is empty`); nothing is written.
+- `--reg==` (the expression register) is refused. Reading it would *evaluate*
+  whatever expression it holds -- every other register read here is a plain
+  text read, and `--reg` should not be the one that runs code.
+
+**CRLF is normalized on the way in.** Clipboard text copied out of a browser
+or ticket tool is usually CRLF-terminated, and a stray carriage return is an
+artifact of where the text came from, not content. All three decoders tolerate
+it, but anything that passes a line through verbatim does not -- `:JSON ndjson`
+re-emits a line it could not decode exactly as found, which used to put a
+literal `^M` in the result. A CR in the *middle* of a line is content and stays.
 
 **`--out-reg` says what it did.** A register write is invisible, so it reports
 `wrote 12 line(s) to register '+'` rather than looking like it did nothing.

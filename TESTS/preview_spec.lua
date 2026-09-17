@@ -226,6 +226,45 @@ describe("data.preview.confirm", function()
     end
   end)
 
+  it("never deletes a buffer it merely found in one of those windows", function()
+    -- Regression: the teardown used to delete the buffer behind every window
+    -- diff.nvim opened, with force = true. "A window diff.nvim opened" is not
+    -- the same claim as "a buffer diff.nvim created" -- an older diff.nvim's
+    -- view=tab showed the ORIGIN buffer in its new tab, so the teardown threw
+    -- away the user's unsaved work. The stub below is exactly that shape.
+    local victim = vim.api.nvim_create_buf(true, false)
+    vim.api.nvim_buf_set_lines(victim, 0, -1, false, { "UNSAVED WORK" })
+
+    local real_diff = package.loaded["diff"]
+    package.loaded["diff"] = {
+      run = function()
+        vim.cmd("tabnew")
+        vim.cmd("buffer " .. victim)
+      end,
+    }
+    --- Test double: restored via `orig_select` in `after_each`.
+    ---@diagnostic disable-next-line: duplicate-set-field
+    vim.ui.select = function(_choices, _opts, cb)
+      cb("Discard")
+    end
+
+    require("data.preview").confirm({
+      before = { "a" },
+      after = { "b" },
+      label = "json filter",
+      prompt = "?",
+    }, function() end)
+
+    package.loaded["diff"] = real_diff
+
+    local survived = vim.api.nvim_buf_is_valid(victim)
+    if survived then
+      vim.api.nvim_buf_delete(victim, { force = true })
+    end
+    ---@diagnostic disable-next-line: undefined-field
+    assert.is_true(survived, "closing the window is all data.nvim has any business doing")
+  end)
+
   it("leaves no holder or preview buffers behind", function()
     local before_count = #vim.api.nvim_list_bufs()
     --- Test double: restored via `orig_select` in `after_each`.

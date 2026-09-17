@@ -26,6 +26,20 @@ local READ_ONLY = {
   ["="] = true,
 }
 
+---@internal
+--- The expression register is refused as a SOURCE too. That is a separate
+--- rule from the write ban above, and it does not follow from it.
+---
+--- `getreg("=")` *evaluates* the stored expression rather than returning
+--- stored text -- verified, not assumed: a `=` register holding a
+--- `luaeval(...)` call runs that call and hands back its result. Every other
+--- register read here is a plain text read with no side effects, and `--reg`
+--- reads like one. A formatting command that executes whatever expression
+--- happens to be sitting in `=` is a surprise nobody asked for, so this is a
+--- named refusal rather than a silent evaluation.
+---@type table<string, true>
+local UNREADABLE = { ["="] = true }
+
 --- Resolve a `--reg`/`--out-reg` flag value to a register name.
 ---
 --- `nil`/`false` (flag absent) resolves to `nil, nil` -- not an error, just
@@ -92,10 +106,26 @@ end
 --- into a trailing empty element -- dropped here so the caller gets the
 --- lines that were yanked and not one blank extra, which would otherwise
 --- show up as a stray empty line in every scratch split.
+---
+--- CRLF is normalized away for the same reason that trailing blank is: it is
+--- an artifact of where the text came from, not content. The register scope
+--- exists for "I copied this out of a ticket tool", and on Windows that text
+--- arrives CRLF-terminated far more often than not. All three decoders
+--- tolerate the stray CR (it is whitespace to each of them), but anything
+--- that passes a line through verbatim does not -- `:JSON ndjson` re-emits a
+--- line it could not decode exactly as it found it, which put a literal `^M`
+--- into the result. Only a LINE-TERMINATING CR is dropped; one in the middle
+--- of a line is content and stays.
 ---@param name string
 ---@return string[]|nil lines
 ---@return string|nil err
 function M.read(name)
+  if UNREADABLE[name] then
+    return nil,
+      ("register '%s' is the expression register -- reading it would evaluate its contents"):format(
+        name
+      )
+  end
   local ok, text = pcall(vim.fn.getreg, name)
   if not ok then
     return nil, ("could not read register '%s': %s"):format(name, tostring(text))
@@ -108,6 +138,12 @@ function M.read(name)
   end
 
   local lines = vim.split(text, "\n", { plain = true })
+  for i = 1, #lines do
+    local line = lines[i]
+    if line:sub(-1) == "\r" then
+      lines[i] = line:sub(1, -2)
+    end
+  end
   if #lines > 1 and lines[#lines] == "" then
     lines[#lines] = nil
   end
