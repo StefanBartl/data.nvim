@@ -168,6 +168,20 @@ function M.write(name, lines)
   if not ok then
     return false, ("could not write register '%s': %s"):format(name, tostring(err))
   end
+
+  -- `setreg("+"/"*", ...)` does not raise when there is no clipboard
+  -- provider -- it silently does nothing -- so for the two registers that
+  -- actually depend on one, `pcall` not raising is not proof the write
+  -- landed. Every other register (including the unnamed one) is ordinary
+  -- Vim state that always holds whatever it was just set to, so this
+  -- round-trip check only runs where it can actually catch something.
+  if name == "+" or name == "*" then
+    local got_ok, got = pcall(vim.fn.getreg, name, 1, true)
+    if not got_ok or not vim.deep_equal(got, lines) then
+      return false, ("register '%s' has no clipboard provider -- nothing was written"):format(name)
+    end
+  end
+
   return true, nil
 end
 

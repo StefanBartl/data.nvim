@@ -188,6 +188,43 @@ describe("data.scope.register.name -- the clipboard fallback", function()
   end)
 end)
 
+describe("data.scope.register.write -- the clipboard round-trip", function()
+  --- Whether "+" genuinely holds what it is set to on this machine. Probed
+  --- rather than assumed, same reasoning as `without_clipboard` above: a
+  --- CI runner with no provider is a real, common case, not an edge case.
+  ---@return boolean
+  local function real_clipboard_works()
+    vim.fn.setreg("+", "")
+    local set_ok = pcall(vim.fn.setreg, "+", "clipboard_probe")
+    local works = false
+    if set_ok then
+      local get_ok, got = pcall(vim.fn.getreg, "+")
+      works = get_ok and got == "clipboard_probe"
+    end
+    vim.fn.setreg("+", "")
+    return works
+  end
+
+  it("reports failure instead of a false success when the write does not land", function()
+    local works = real_clipboard_works()
+    local ok, err = register.write("+", { "x", "y" })
+    if works then
+      assert.is_true(ok)
+      assert.is_nil(err)
+    else
+      assert.is_false(ok)
+      assert.matches("no clipboard provider", err)
+    end
+  end)
+
+  it("leaves an ordinary register alone -- no round trip to verify", function()
+    vim.fn.setreg("q", "", "c")
+    local ok = register.write("q", { "x", "y" })
+    assert.is_true(ok, "an ordinary register always holds whatever it was set to")
+    assert.equals("x\ny\n", vim.fn.getreg("q"))
+  end)
+end)
+
 describe("data.scope.register.writable -- every register Vim itself refuses", function()
   -- `:help registers` lists five read-only ones. Rejecting them up front with
   -- a name-the-register message beats letting `setreg` fail with a raw Vim
