@@ -379,6 +379,28 @@ function M.convert(src_fmt, dst_fmt, cmd, opts, flags)
   deliver(sink, source, out, dst_fmt, "pretty")
 end
 
+---@internal
+--- Re-read `source.s0`/`source.e0` from the extmark tracking its scope
+--- across the interactive prompt. `nvim_buf_get_extmark_by_id` returns an
+--- empty list (not an error) when `mark_id` no longer resolves to a mark --
+--- e.g. a foreign `nvim_buf_clear_namespace` call wiping it out from under
+--- an otherwise-still-valid buffer -- and `mark[1]` is then nil, which a
+--- caller must not hand to `nvim_buf_get_lines`/`nvim_buf_set_lines`
+--- unchecked.
+---@param bufnr integer
+---@param mark_id integer
+---@param source Data.Source
+---@return boolean ok # false when the mark itself is gone; source is untouched
+local function refresh_source_from_mark(bufnr, mark_id, source)
+  local mark = vim.api.nvim_buf_get_extmark_by_id(bufnr, FILTER_NS, mark_id, { details = true })
+  if mark[1] == nil then
+    return false
+  end
+  source.s0 = mark[1]
+  source.e0 = (mark[3] and mark[3].end_row) and (mark[3].end_row - 1) or source.e0
+  return true
+end
+
 --- Interactively filter the resolved input down to the flattened path/value
 --- entries matching a user-built `pickers.refine` clause stack (`:JSON
 --- filter`/`:YAML filter`/`:XML filter`), then deliver the survivors'
@@ -491,9 +513,10 @@ function M.filter(fmt, cmd, opts, flags)
         )
         return
       end
-      local mark = vim.api.nvim_buf_get_extmark_by_id(bufnr, FILTER_NS, mark_id, { details = true })
-      source.s0 = mark[1]
-      source.e0 = (mark[3] and mark[3].end_row) and (mark[3].end_row - 1) or source.e0
+      if not refresh_source_from_mark(bufnr, mark_id, source) then
+        notify.error(prefix .. "the scope's tracking mark is gone -- discarding the result")
+        return
+      end
       before = vim.api.nvim_buf_get_lines(bufnr, source.s0, (source.e0 or 0) + 1, false)
     end
 
@@ -531,10 +554,10 @@ function M.filter(fmt, cmd, opts, flags)
           notify.error(prefix .. "buffer was closed during the preview -- discarding the result")
           return
         end
-        local mark =
-          vim.api.nvim_buf_get_extmark_by_id(bufnr, FILTER_NS, mark_id, { details = true })
-        source.s0 = mark[1]
-        source.e0 = (mark[3] and mark[3].end_row) and (mark[3].end_row - 1) or source.e0
+        if not refresh_source_from_mark(bufnr, mark_id, source) then
+          notify.error(prefix .. "the scope's tracking mark is gone -- discarding the result")
+          return
+        end
       end
       del_mark()
 
