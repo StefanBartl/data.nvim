@@ -96,6 +96,17 @@ describe("data.config", function()
     assert.is_true(found, "expected a warning naming the type mismatch")
   end)
 
+  it("does not alias the shared DEFAULTS table before setup() is ever called", function()
+    -- ERR-51: M.options must never literally BE the defaults table -- a
+    -- write through the public field (or any write before setup() has run)
+    -- would otherwise corrupt DEFAULTS for the rest of the session.
+    local defaults = require("data.config.DEFAULTS")
+    ---@diagnostic disable-next-line: undefined-field
+    assert.are_not.equals(defaults, config.options)
+    config.options.json.indent = 8
+    assert.equals(2, defaults.json.indent, "mutating options.json must not reach DEFAULTS.json")
+  end)
+
   it("get() returns a deep copy, not a live reference into the stored config", function()
     config.setup(nil)
     ---@diagnostic disable-next-line: undefined-field

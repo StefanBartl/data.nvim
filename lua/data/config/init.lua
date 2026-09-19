@@ -13,7 +13,10 @@ local raw_notify = require("lib.nvim.notify").create("[data]")
 ---@field options DataConfig
 local M = {}
 
-M.options = DEFAULTS
+-- A deep copy, not the shared DEFAULTS table itself: M.options is public
+-- (see the @field above), and a write through it before setup() has ever
+-- run must not corrupt DEFAULTS for the rest of the session.
+M.options = vim.deepcopy(DEFAULTS)
 
 ---@internal
 --- Warn about any key in `opts` that `schema` doesn't recognize, or whose
