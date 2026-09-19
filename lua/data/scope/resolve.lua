@@ -48,12 +48,16 @@ local function fenced_block_scope(bufnr, fmt)
     return nil, nil
   end
   local ok, cma = pcall(require, "color_my_ascii")
-  if not ok or type(cma.fences) ~= "table" then
+  if not ok or type(cma.fences) ~= "table" or type(cma.fences.block_at) ~= "function" then
     return nil, nil
   end
   local row0 = vim.api.nvim_win_get_cursor(0)[1] - 1
-  local block = cma.fences.block_at(bufnr, row0, { lang = langs })
-  if not block or block.content_end <= block.content_start then
+  -- pcall'd: color_my_ascii is a plugin API at a system boundary, and a
+  -- version drift or an internal error there must fall back to whole-buffer
+  -- the same way an absent color_my_ascii already does above, not abort the
+  -- invocation.
+  local call_ok, block = pcall(cma.fences.block_at, bufnr, row0, { lang = langs })
+  if not call_ok or not block or block.content_end <= block.content_start then
     return nil, nil
   end
   return block.content_start, block.content_end - 1
