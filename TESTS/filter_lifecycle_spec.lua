@@ -764,3 +764,68 @@ describe("BUG: replacing the scope LINE-WISE mid-prompt inverts the extmark", fu
     vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
   end)
 end)
+
+describe("data.filter -- the tracking mark disappearing mid-run (ERR-02)", function()
+  -- `nvim_buf_get_extmark_by_id` returns an empty list, not an error, when
+  -- the id no longer resolves -- e.g. a foreign `nvim_buf_clear_namespace`
+  -- call wiping it out while the buffer itself stays perfectly valid. Before
+  -- the fix, the resulting nil `source.s0` reached `nvim_buf_get_lines`/
+  -- `nvim_buf_set_lines` unchecked and raised a raw API error instead of the
+  -- clean notification every other exit path in this function produces.
+
+  local bufnr, had_filter
+
+  before_each(function()
+    for _, name in ipairs({ "data", "data.config", "data.bindings", "data.bindings.usrcmds" }) do
+      package.loaded[name] = nil
+    end
+    require("data").setup()
+    had_filter = package.loaded["data.filter"]
+    bufnr = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_set_current_buf(bufnr)
+  end)
+
+  after_each(function()
+    package.loaded["data.filter"] = had_filter
+    if vim.api.nvim_buf_is_valid(bufnr) then
+      vim.api.nvim_buf_delete(bufnr, { force = true })
+    end
+  end)
+
+  it("reports cleanly instead of raising when the mark vanishes before the write", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "H", '{"a":1}', "T" })
+    package.loaded["data.filter"] = filter_double({ "FILTERED" }, nil, function()
+      vim.api.nvim_buf_clear_namespace(bufnr, FILTER_NS, 0, -1)
+    end)
+
+    local msgs = capture_notify(function()
+      require("data").filter("json", { range = 2, line1 = 2, line2 = 2 })
+    end)
+
+    assert.same(
+      { "H", '{"a":1}', "T" },
+      vim.api.nvim_buf_get_lines(bufnr, 0, -1, false),
+      "the scope is left untouched, not clobbered from a stale s0/e0"
+    )
+    assert.is_true(said(msgs, "tracking mark is gone"))
+  end)
+
+  it("reports cleanly instead of raising when the mark vanishes during the preview", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "H", '{"a":1}', "T" })
+    package.loaded["data.filter"] = filter_double({ "FILTERED" }, nil)
+    package.loaded["data.preview"] = preview_double(true, nil, function()
+      vim.api.nvim_buf_clear_namespace(bufnr, FILTER_NS, 0, -1)
+    end)
+
+    local msgs = capture_notify(function()
+      require("data").filter("json", { range = 2, line1 = 2, line2 = 2 }, {}, { preview = true })
+    end)
+
+    assert.same(
+      { "H", '{"a":1}', "T" },
+      vim.api.nvim_buf_get_lines(bufnr, 0, -1, false),
+      "the scope is left untouched, not clobbered from a stale s0/e0"
+    )
+    assert.is_true(said(msgs, "tracking mark is gone"))
+  end)
+end)
