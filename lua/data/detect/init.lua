@@ -58,12 +58,16 @@ local function fenced_block_format(bufnr)
     return nil
   end
   local ok, cma = pcall(require, "color_my_ascii")
-  if not ok or type(cma.fences) ~= "table" then
+  if not ok or type(cma.fences) ~= "table" or type(cma.fences.block_at) ~= "function" then
     return nil
   end
   local row0 = vim.api.nvim_win_get_cursor(0)[1] - 1
-  local block = cma.fences.block_at(bufnr, row0, {})
-  if not block or not block.lang then
+  -- pcall'd: same system-boundary reasoning as data.scope.resolve's own
+  -- fenced-block fallback -- a version drift or an internal error in
+  -- color_my_ascii must fall through to filetype detection below, not abort
+  -- the invocation.
+  local call_ok, block = pcall(cma.fences.block_at, bufnr, row0, {})
+  if not call_ok or not block or not block.lang then
     return nil
   end
   return FORMAT_BY_FENCE_LANG[block.lang]

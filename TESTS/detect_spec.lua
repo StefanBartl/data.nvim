@@ -125,6 +125,52 @@ describe("data.detect.format -- fenced-block detection (color_my_ascii)", functi
   end)
 end)
 
+describe("data.detect.format -- fenced-block failure handling (ERR-01)", function()
+  -- Not gated on the real color_my_ascii being installed -- same
+  -- inject-a-fake-module-into-package.loaded approach as
+  -- scope_resolve_spec.lua's counterpart, so this runs everywhere.
+  local bufnr, had_cma
+
+  before_each(function()
+    package.loaded["data.config"] = nil
+    require("data.config").setup(nil)
+
+    bufnr = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_set_current_buf(bufnr)
+    had_cma = package.loaded["color_my_ascii"]
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "```yaml", "a: 1", "```" })
+    vim.api.nvim_win_set_cursor(0, { 2, 0 })
+  end)
+
+  after_each(function()
+    package.loaded["color_my_ascii"] = had_cma
+    vim.api.nvim_buf_delete(bufnr, { force = true })
+  end)
+
+  it("falls back to filetype detection instead of raising when block_at throws", function()
+    ---@diagnostic disable-next-line: duplicate-set-field
+    package.loaded["color_my_ascii"] = {
+      fences = {
+        block_at = function()
+          error("boom")
+        end,
+      },
+    }
+    vim.bo[bufnr].filetype = "json"
+    local ok, fmt = pcall(require("data.detect").format, bufnr, { range = 0 })
+    assert.is_true(ok, "a throwing plugin API must not raise out of detect.format")
+    assert.equals("json", fmt, "falls through to the filetype signal")
+  end)
+
+  it("falls back to filetype detection when fences.block_at isn't callable", function()
+    ---@diagnostic disable-next-line: duplicate-set-field
+    package.loaded["color_my_ascii"] = { fences = { block_at = "not a function" } }
+    vim.bo[bufnr].filetype = "json"
+    local fmt = require("data.detect").format(bufnr, { range = 0 })
+    assert.equals("json", fmt)
+  end)
+end)
+
 describe(":Data", function()
   local bufnr
 
