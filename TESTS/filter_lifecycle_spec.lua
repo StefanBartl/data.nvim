@@ -837,3 +837,68 @@ describe("data.filter -- the tracking mark disappearing mid-run (ERR-02)", funct
     assert.is_true(said(msgs, "tracking mark is gone"))
   end)
 end)
+
+describe("data.filter -- a content edit while the CONFIRM DIALOG was open", function()
+  -- One async gap later than "the span the result is written to" above: that
+  -- block covers an edit made while the CLAUSE PROMPT (data.filter.run) is
+  -- open, re-checked before the preview is even shown. This is the second
+  -- gap -- the confirm dialog itself (vim.ui.select, behind data.preview) is
+  -- just as async, and nothing locks the buffer while the user is looking at
+  -- it. The mark's position survives a character-level edit inside the span
+  -- untouched, so a position-only refresh right before the write would wave
+  -- an Apply through with the pre-dialog `out`, silently discarding whatever
+  -- landed during the dialog.
+
+  local bufnr, had_filter, had_preview
+
+  before_each(function()
+    for _, name in ipairs({ "data", "data.config", "data.bindings", "data.bindings.usrcmds" }) do
+      package.loaded[name] = nil
+    end
+    require("data").setup()
+    had_filter = package.loaded["data.filter"]
+    had_preview = package.loaded["data.preview"]
+    bufnr = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_set_current_buf(bufnr)
+  end)
+
+  after_each(function()
+    package.loaded["data.filter"] = had_filter
+    package.loaded["data.preview"] = had_preview
+    if vim.api.nvim_buf_is_valid(bufnr) then
+      vim.api.nvim_buf_delete(bufnr, { force = true })
+    end
+  end)
+
+  it("refuses to apply when the scope was edited while the dialog was open", function()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "H", '{"a":1}', "T" })
+    package.loaded["data.filter"] = filter_double({ "FILTERED" }, nil)
+    package.loaded["data.preview"] = preview_double(true, nil, function()
+      -- The edit happens INSIDE confirm()'s `during`, i.e. after the diff
+      -- was shown and the user is deciding, before on_decision(true) fires.
+      vim.api.nvim_buf_set_text(bufnr, 1, 5, 1, 6, { "9" })
+    end)
+
+    local msgs = capture_notify(function()
+      require("data").filter("json", { range = 2, line1 = 2, line2 = 2 }, {}, { preview = true })
+    end)
+
+    assert.same(
+      { "H", '{"a":9}', "T" },
+      vim.api.nvim_buf_get_lines(bufnr, 0, -1, false),
+      "the edit made during the confirm dialog must survive untouched"
+    )
+    assert.is_true(said(msgs, "scope changed while the preview dialog was open"))
+  end)
+
+  it("still applies cleanly when nothing changes during the dialog", function()
+    -- Control: the new check must not false-positive on the ordinary path.
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "H", '{"a":1}', "T" })
+    package.loaded["data.filter"] = filter_double({ "FILTERED" }, nil)
+    package.loaded["data.preview"] = preview_double(true, nil)
+
+    require("data").filter("json", { range = 2, line1 = 2, line2 = 2 }, {}, { preview = true })
+
+    assert.same({ "H", "FILTERED", "T" }, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
+  end)
+end)

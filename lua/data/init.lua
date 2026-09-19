@@ -583,6 +583,31 @@ function M.filter(fmt, cmd, opts, flags)
           notify.error(prefix .. "the scope's tracking mark is gone -- discarding the result")
           return
         end
+
+        -- Same content-drift gap as the mid-prompt check above, one async
+        -- step later: the confirm dialog (vim.ui.select, wrapped by
+        -- data.preview) is itself async, and nothing locks the buffer while
+        -- it is open. A character-level edit inside the span leaves the
+        -- extmark's position untouched, so the position-only refresh just
+        -- above is not enough on its own -- `out` was computed from `before`,
+        -- the snapshot the user actually reviewed in the diff, and an Apply
+        -- click must not silently replace text that changed after that
+        -- snapshot was taken. Same inverted-span exclusion as the first
+        -- check: a line-wise rewrite of the exact span fails loudly a few
+        -- lines down instead.
+        if
+          source.s0 <= (source.e0 or -1)
+          and not vim.deep_equal(
+            vim.api.nvim_buf_get_lines(bufnr, source.s0, (source.e0 or 0) + 1, false),
+            before
+          )
+        then
+          notify.error(
+            prefix .. "the scope changed while the preview dialog was open -- discarding the result"
+          )
+          del_mark()
+          return
+        end
       end
       del_mark()
 
