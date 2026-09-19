@@ -518,6 +518,31 @@ function M.filter(fmt, cmd, opts, flags)
         return
       end
       before = vim.api.nvim_buf_get_lines(bufnr, source.s0, (source.e0 or 0) + 1, false)
+
+      -- The extmark only proves the scope is still in the same PLACE, not
+      -- that it still holds the same TEXT: a character-level edit inside it
+      -- (nvim_buf_set_text, :s///) leaves start/end untouched, so the write
+      -- below would otherwise silently replace freshly-typed text with a
+      -- result computed from what was there before the prompt opened.
+      --
+      -- Two things this must NOT re-flag, so both are excluded explicitly:
+      -- a line-wise rewrite of the exact span already inverts the extmark
+      -- (`source.s0 > source.e0`) and fails loudly of its own accord a few
+      -- lines down, with a clearer diagnosis than this check could give; and
+      -- `--preview` already shows the freshly re-read content for the user
+      -- to judge before anything is written, so there is nothing silent to
+      -- guard against there.
+      if
+        not preview
+        and source.s0 <= (source.e0 or -1)
+        and not vim.deep_equal(before, source.lines)
+      then
+        notify.error(
+          prefix .. "the scope changed while the prompt was open -- discarding the result"
+        )
+        del_mark()
+        return
+      end
     end
 
     if not preview or vim.deep_equal(before, out) then

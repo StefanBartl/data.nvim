@@ -213,9 +213,13 @@ user-visible behaviour or lives in a dependency — a fix flips the assertion.
    result is discarded and the message names an API constraint — the very
    outcome the surrounding `pcall`'s own comment says it was added to avoid. The
    trigger is a line-wise buffer rewrite (format-on-save, an applied LSP edit,
-   another plugin), not an exotic one. Character-level edits, `:s///`, partial
-   replacements, deletions and insertions above the scope all work — pinned as
-   controls, so a fix has both sides to aim at.
+   another plugin), not an exotic one. `:s///`, partial replacements,
+   deletions and insertions above the scope all work — pinned as controls, so
+   a fix has both sides to aim at. (A character-level edit, `nvim_buf_set_text`
+   included, used to fall through this same gap silently — the extmark stays
+   intact, so nothing caught it — but that half is now fixed: `M.filter`
+   re-reads the scope's live content, not just its position, and refuses the
+   write when it no longer matches what the result was computed from.)
 6. **A tab-indented YAML child is silently promoted to the document root**
    (`malformed_spec.lua`). `a:` + a tab-indented `b: 1` decodes to `{b = 1}`:
    the parent key is *gone*, with no error. Defect in

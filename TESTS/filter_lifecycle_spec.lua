@@ -694,7 +694,11 @@ describe("BUG: replacing the scope LINE-WISE mid-prompt inverts the extmark", fu
     assert.is_true(said(msgs, "'start' is higher than 'end'"))
   end)
 
-  it("control: a character-level edit of the scope works", function()
+  it("a character-level edit of the scope is detected and refused", function()
+    -- The extmark's start/end survive a set_text edit untouched (that's the
+    -- line-wise sibling's bug, not this one) -- so the position re-check alone
+    -- would wave this through with a result computed from the pre-edit text.
+    -- The content re-check catches it instead.
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "H", '{"a":1}', "T" })
     package.loaded["data.filter"] = filter_double({ "FILTERED" }, nil, function()
       vim.api.nvim_buf_set_text(bufnr, 1, 5, 1, 6, { "9" })
@@ -704,8 +708,12 @@ describe("BUG: replacing the scope LINE-WISE mid-prompt inverts the extmark", fu
       require("data").filter("json", { range = 2, line1 = 2, line2 = 2 })
     end)
 
-    assert.same({ "H", "FILTERED", "T" }, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
-    assert.equals(0, #msgs)
+    assert.same(
+      { "H", '{"a":9}', "T" },
+      vim.api.nvim_buf_get_lines(bufnr, 0, -1, false),
+      "the edit made during the prompt must survive untouched"
+    )
+    assert.is_true(said(msgs, "scope changed while the prompt was open"))
   end)
 
   it("control: replacing only PART of a multi-line scope works", function()
