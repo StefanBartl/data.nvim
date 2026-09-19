@@ -107,6 +107,43 @@ describe("data.config", function()
     assert.equals(2, defaults.json.indent, "mutating options.json must not reach DEFAULTS.json")
   end)
 
+  it("does not re-alias DEFAULTS sub-tables through a real setup() call", function()
+    -- The module-load-time deepcopy (the previous test) only covers the
+    -- window before setup() is ever called. lib_config.deep_merge itself
+    -- copies its `base` argument only one level deep -- any key `opts`
+    -- doesn't touch comes back as a reference to that DEFAULTS sub-table,
+    -- not a copy of it -- so a setup() call that never mentions "yaml" must
+    -- still not leave config.options.yaml literally BE DEFAULTS.yaml.
+    local defaults = require("data.config.DEFAULTS")
+    config.setup({ json = { indent = 4 } })
+    ---@diagnostic disable-next-line: undefined-field
+    assert.are_not.equals(defaults.yaml, config.options.yaml)
+    ---@diagnostic disable-next-line: undefined-field
+    config.options.yaml.indent = 99
+    assert.equals(
+      2,
+      defaults.yaml.indent,
+      "mutating options.yaml after setup() must not reach DEFAULTS"
+    )
+  end)
+
+  it("survives a second setup() call without DEFAULTS having been corrupted first", function()
+    -- Guards the exact failure chain: a first setup() aliases DEFAULTS.yaml,
+    -- a write through options.yaml corrupts it, and a second setup() (a
+    -- second lazy.nvim load, :PluginReload, another test's before_each)
+    -- merges onto that already-corrupted baseline.
+    config.setup({})
+    ---@diagnostic disable-next-line: undefined-field
+    config.options.yaml.indent = 77
+    config.setup({})
+    ---@diagnostic disable-next-line: undefined-field
+    assert.equals(
+      2,
+      config.get("yaml.indent"),
+      "a fresh setup() must read the real default, not a leaked mutation"
+    )
+  end)
+
   it("get() returns a deep copy, not a live reference into the stored config", function()
     config.setup(nil)
     ---@diagnostic disable-next-line: undefined-field

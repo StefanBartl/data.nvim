@@ -64,15 +64,28 @@ local function validate(schema, opts, prefix)
 end
 
 --- Apply user options. Safe to call once from `setup()`.
+---
+--- `lib_config.deep_merge` copies `base` only one level at a time: every key
+--- `opts` doesn't touch is carried over as `out[k] = v`, a reference to that
+--- DEFAULTS sub-table, not a copy of it (see its own doc comment -- that's
+--- deliberate there, a pure two-argument helper has no business assuming its
+--- caller wants a deep copy). Assigning its result straight to `M.options`
+--- therefore re-aliased DEFAULTS's untouched sub-tables on every real
+--- `setup()` call, undoing the module-load-time `vim.deepcopy` above for the
+--- entire rest of the session: `M.options.yaml` became `DEFAULTS.yaml` again
+--- the moment `opts` didn't mention `yaml`, and a write through the public
+--- `options` field (the exact access pattern `M.get`'s own doc comment warns
+--- about) would corrupt DEFAULTS itself. `vim.deepcopy` on the merge result
+--- severs that aliasing.
 ---@param opts DataConfig|nil
 ---@return nil
 function M.setup(opts)
   if type(opts) ~= "table" then
-    M.options = lib_config.deep_merge(DEFAULTS, {})
+    opts = {}
   else
     validate(DEFAULTS, opts, "")
-    M.options = lib_config.deep_merge(DEFAULTS, opts)
   end
+  M.options = vim.deepcopy(lib_config.deep_merge(DEFAULTS, opts))
 end
 
 --- Read a value by dot-path, e.g. `get("json.indent")`. A table-valued
