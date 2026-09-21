@@ -99,3 +99,8 @@ add_optional_dep("PICKERS_DIR", "pickers.nvim", "pickers.refine")
 --- docs/integrations.md). Specs that need it skip themselves when it's
 --- absent.
 add_optional_dep("DIFF_DIR", "diff.nvim", "diff")
+
+-- Swap and shada stay off for the whole suite, including plenary's child
+-- processes that reuse this file: stale swap files fail suites with E326.
+vim.o.swapfile = false
+vim.o.shadafile = "NONE"

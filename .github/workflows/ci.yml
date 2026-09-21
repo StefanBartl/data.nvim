@@ -13,6 +13,7 @@ on:
 jobs:
   stylua:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: JohnnyMorganz/stylua-action@v4
@@ -23,6 +24,7 @@ jobs:
 
   luacheck:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       # PUC Lua 5.4, not LuaJIT: `std = "luajit"` in .luacheckrc pins which
@@ -48,6 +50,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       # lib.nvim is a runtime dependency (json, tables.path_flatten, notify,
@@ -67,6 +70,8 @@ jobs:
         with:
           repository: nvim-lua/plenary.nvim
           path: .deps/plenary.nvim
+          # Pinned to the 2026-09-20 HEAD; bump deliberately, not by drifting.
+          ref: 74b06c6c75e4eeb3108ec01852001636d85a932b
       - uses: rhysd/action-setup-vim@v1
         with:
           neovim: true
@@ -74,5 +79,13 @@ jobs:
       # windows-latest's default shell is pwsh, not bash -- scripts/test.sh
       # is a bash script (Git for Windows ships one on every windows-latest
       # runner, actions/checkout already needs it).
-      - run: scripts/test.sh
+      - run: |
+          exec > >(tee -a "$RUNNER_TEMP/test-output.log") 2>&1
+          scripts/test.sh
         shell: bash
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-output-tests-${{ matrix.os }}
+          path: ${{ runner.temp }}/test-output.log
+          if-no-files-found: ignore
