@@ -48,7 +48,7 @@ decoded Lua table (Lua tables have no such concept) — so "pretty, as read" and
 always sorts attribute names and never reorders elements (there's no "unsorted"
 element order to begin with — a document's element sequence *is* its order), so
 `sort` is a no-op there for a different, XML-specific reason. See each
-`data.format.*` module's own doc comment and [commands.md](docs/commands.md).
+`data.format.*` module's own doc comment and [commands.md](commands.md).
 Building a custom order-preserving JSON/YAML decoder just to make the two
 commands diverge was judged out of scope for what a "pretty-print my pasted log"
 plugin needs; `sort` is kept as an explicit, self-documenting route rather than
