@@ -3,30 +3,25 @@
 ## Running the tests
 
 ```bash
-LIB_NVIM_DIR=/path/to/lib.nvim scripts/test.sh
+scripts/test.sh                  # every spec
+scripts/test.sh --file config    # only spec files whose name contains "config"
 ```
 
-`scripts/minimal_init.lua` also looks for a sibling `../lib.nvim` checkout or a
-`.deps/lib.nvim` clone, and for `plenary.nvim` the same way (`PLENARY_DIR`,
-`.deps/plenary.nvim`, or `../plenary.nvim`) — see that file for the exact search
-order. `scripts/test.sh path/to_spec.lua` runs a single spec file.
+The suite runs on [testing.nvim](https://github.com/StefanBartl/testing.nvim).
+`scripts/test.sh` looks up testing.nvim and every dependency (`lib.nvim`,
+`color_my_ascii.nvim`, `diff.nvim`, `pickers.nvim`) in four places, in this
+order: `$<NAME>_DIR` (for example `LIB_NVIM_DIR`), `.deps/<name>`, a sibling
+`../<name>` checkout, `stdpath('data')/lazy/<name>`. A dependency that is
+missing stops the run with exit code 1 and a message naming all four places.
 
-`COLOR_MY_ASCII_DIR`, `PICKERS_DIR` and `DIFF_DIR` (or a sibling
-`../color_my_ascii.nvim`/`../pickers.nvim`/`../diff.nvim`, or a `.deps/` clone)
-are looked up the same way but are optional: the specs that need one skip
-themselves when it isn't found, rather than failing the run — the fenced-scope
-specs in `scope_resolve_spec.lua`, the `filter` specs in `filter_spec.lua`, and
-the preview specs in `preview_spec.lua`. See
-[integrations.md](integrations.md).
-
-**A skipped spec still reports "Success".** Plenary has no "skipped" outcome,
-so a describe that registers zero tests is invisible in the output — if you are
-working on one of those integrations, check that its `it`s actually appear in
-the run rather than trusting the green line at the bottom. Each of those three
-specs now has a counterpart that runs everywhere against a double
+`color_my_ascii.nvim`, `pickers.nvim` and `diff.nvim` are optional for the
+plugin itself, but the test run loads them, so the specs that need one
+(`scope_resolve_spec.lua`, `filter_spec.lua`, `preview_spec.lua`) really run
+instead of registering nothing. See [integrations.md](integrations.md). Each of
+those three specs also has a counterpart that runs against a double
 (`filter_failure_spec.lua`, `preview_failure_spec.lua`,
-`filter_lifecycle_spec.lua`), so the green line is not the only thing standing
-behind those code paths.
+`filter_lifecycle_spec.lua`), so no code path is covered only on a machine that
+has all three installed.
 
 [`TESTS/README.md`](../TESTS/README.md) is the register of what the suite
 covers, what it deliberately leaves out and why, and which known defects are

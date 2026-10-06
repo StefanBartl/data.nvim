@@ -55,34 +55,59 @@ jobs:
       - uses: actions/checkout@v5
       # lib.nvim is a runtime dependency (json, tables.path_flatten, notify,
       # usercmd.composer, config) -- a headless run has no plugin manager, so
-      # it is checked out the way scripts/minimal_init.lua's `.deps/`
-      # candidate expects. color_my_ascii.nvim and pickers.nvim are optional
-      # soft deps guarded by pcall() in the specs that need them, so they are
-      # deliberately not checked out here.
+      # it is checked out the way TESTS/minimal_init.lua's `.deps/`
+      # candidate expects. color_my_ascii.nvim, pickers.nvim and diff.nvim are
+      # optional for the plugin itself (guarded by pcall() in the specs that
+      # need them) but listed in .testing.lua, so the run loads them and those
+      # specs really run; testing.nvim is the runner.
       - uses: actions/checkout@v5
         with:
           repository: StefanBartl/lib.nvim
           path: .deps/lib.nvim
           ref: ci-verified
-      # plenary.nvim: the busted-compatible test harness the specs under
-      # TESTS/ are written against.
-      - uses: actions/checkout@v5
-        with:
-          repository: nvim-lua/plenary.nvim
-          path: .deps/plenary.nvim
-          # Pinned to the 2026-09-20 HEAD; bump deliberately, not by drifting.
-          ref: 74b06c6c75e4eeb3108ec01852001636d85a932b
       - uses: rhysd/action-setup-vim@v1
         with:
           neovim: true
           version: stable
+      # Checked out from the branch that only moves once the dependency's own CI is green.
+      - uses: actions/checkout@v5
+        with:
+          repository: "StefanBartl/testing.nvim"
+          path: .deps/testing.nvim
+          ref: ci-verified
+      # color_my_ascii.nvim has no ci-verified branch (its CI runs on main).
+      - uses: actions/checkout@v5
+        with:
+          repository: "StefanBartl/color_my_ascii.nvim"
+          path: .deps/color_my_ascii.nvim
+          ref: main
+      # Checked out from the branch that only moves once the dependency's own CI is green.
+      - uses: actions/checkout@v5
+        with:
+          repository: "StefanBartl/diff.nvim"
+          path: .deps/diff.nvim
+          ref: ci-verified
+      # Checked out from the branch that only moves once the dependency's own CI is green.
+      - uses: actions/checkout@v5
+        with:
+          repository: "StefanBartl/pickers.nvim"
+          path: .deps/pickers.nvim
+          ref: ci-verified
       # windows-latest's default shell is pwsh, not bash -- scripts/test.sh
       # is a bash script (Git for Windows ships one on every windows-latest
       # runner, actions/checkout already needs it).
       - run: |
           exec > >(tee -a "$RUNNER_TEMP/test-output.log") 2>&1
-          scripts/test.sh
+          scripts/test.sh --json "$RUNNER_TEMP/testing-ir.json"
         shell: bash
+      # The IR is what a reporter or a person reads to find out WHICH case failed on WHICH platform.
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: testing-ir-${{ matrix.os }}
+          path: ${{ runner.temp }}/testing-ir.json
+          if-no-files-found: ignore
+          retention-days: 14
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
