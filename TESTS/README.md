@@ -1,7 +1,7 @@
 # TESTS/
 
-data.nvim's automated suite: plenary.nvim's busted-compatible harness
-(`describe`/`it`/`before_each`, luassert assertions), one file per concern,
+data.nvim's automated suite: busted-style specs
+(`describe`/`it`/`before_each`, luassert assertions) run by testing.nvim, one file per concern,
 every file named `*_spec.lua`.
 
 ## Table of content
@@ -17,34 +17,37 @@ every file named `*_spec.lua`.
 
 ```sh
 scripts/test.sh                       # every spec under TESTS/
-scripts/test.sh TESTS/api_spec.lua    # one file
+scripts/test.sh --file api            # spec files whose name contains "api"
+scripts/test.sh --json ir.json        # also write the machine-readable result
 ```
 
-`scripts/test.sh` wraps `nvim --clean --headless -u scripts/minimal_init.lua`;
-that bootstrap file documents how each dependency is found and why `-u` and
-`--clean` both matter. CI runs exactly this script, on Linux **and** Windows.
+`scripts/test.sh` hands everything to `testing run .` (testing.nvim); the
+project's configuration is `.testing.lua` and the runtimepath of every child
+editor comes from `TESTS/minimal_init.lua`. CI runs exactly this script, on
+Linux, Windows **and** macOS.
 
-Dependencies, all resolved by `scripts/minimal_init.lua` from an env var, a
-`.deps/<name>` checkout, or a sibling directory:
+Dependencies, all resolved by `scripts/test.sh` and `TESTS/minimal_init.lua`
+from an env var, a `.deps/<name>` checkout, a sibling directory or the plugin
+manager's directory (a missing one stops the run with exit code 1):
 
-| Dependency | Env var | Required? |
+| Dependency | Env var | Needed for |
 |---|---|---|
-| lib.nvim | `LIB_NVIM_DIR` | **yes** — `data.*` modules require it directly |
-| plenary.nvim | `PLENARY_DIR` | **yes** — the harness itself |
-| color_my_ascii.nvim | `COLOR_MY_ASCII_DIR` | no — fenced-block scope |
-| pickers.nvim | `PICKERS_DIR` | no — `filter` |
-| diff.nvim | `DIFF_DIR` | no — `filter --preview` |
+| testing.nvim | `TESTING_NVIM_DIR` | the runner itself |
+| lib.nvim | `LIB_NVIM_DIR` | `data.*` modules require it directly |
+| color_my_ascii.nvim | `COLOR_MY_ASCII_NVIM_DIR` | fenced-block scope |
+| pickers.nvim | `PICKERS_NVIM_DIR` | `filter` |
+| diff.nvim | `DIFF_NVIM_DIR` | `filter --preview` |
 
 A spec that needs an optional dependency checks `pcall(require, ...)` itself
-and registers zero `it`s when it is absent — which is the correct "skipped"
-outcome, not a failure. **Every such spec has a counterpart that runs
+and registers zero `it`s when it is absent; the test run loads all three, so
+they run here. **Every such spec has a counterpart that runs
 everywhere**, driving the same code against a double (`filter_failure_spec.lua`
 for `filter_spec.lua`, `preview_failure_spec.lua` for `preview_spec.lua`,
 `filter_lifecycle_spec.lua` for both), so no arm of this plugin is covered
 *only* on a machine that happens to have all three installed.
 
-`PlenaryBustedDirectory` gives each spec file its own child nvim process, so
-files cannot leak state into each other. Within a file they can, and the
+`.testing.lua` sets `isolated = "file"`: each spec file runs in its own child
+nvim process, so files cannot leak state into each other. Within a file they can, and the
 specs that replace a `package.loaded` entry restore it in the same `it` or in
 `after_each`.
 

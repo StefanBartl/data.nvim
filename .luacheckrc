@@ -3,7 +3,7 @@ std = "luajit"
 
 -- `luacheck .` walks everything under the repo root, including other
 -- people's Lua: CI installs luacheck itself via luarocks into `.luarocks/`
--- and checks out lib.nvim/plenary under `.deps/`; locally, `.claude/` holds
+-- and checks out its test dependencies under `.deps/`; locally, `.claude/` holds
 -- sibling worktrees. Scanning those turned this gate into 257 warnings from
 -- luarocks' own sources, enough to keep it red regardless of this repo.
 exclude_files = {
