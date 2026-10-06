@@ -21,4 +21,21 @@ return {
   -- scope_register_edge_spec.lua:183 asserts only when the machine has a clipboard provider,
   -- so on a runner without one (ubuntu CI) it makes no assertion at all.
   assertions = "warn",
+  -- Safety nets. The suite passes every guard below cleanly in mode "error" (no file written
+  -- outside the temp dirs, no process or network started by a spec, no blocking prompt, no
+  -- unseen scheduled error, no deprecated API), so no `guard_allow` entry is needed.
+  guards = {
+    fs = "error",
+    scheduled_error = "error",
+    prompt = "error",
+    deprecation = "error",
+    process_net = "error",
+    -- Off on purpose: every case calls `setup()`, which leaves the :Data/:JSON/:YAML/:XML commands
+    -- (the process is thrown away with the file, `isolated = "file"`), and loading a json/yaml
+    -- filetype adds the runtime's syntax highlight groups (about 340 warnings, 42 failing cases
+    -- in mode "error", none of them a leak of the plugin). Known real leak hidden by this: the
+    -- "refuses the expression register" case in scope_register_spec.lua sets a global
+    -- `vim.g.data_nvim_expr_probe` and never unsets it.
+    state = "off",
+  },
 }
