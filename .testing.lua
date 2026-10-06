@@ -17,4 +17,8 @@ return {
   -- "c" = child started from a -c command (v:vim_did_enter is 0, <cword> works),
   -- "l" = `nvim -l`.
   host = "c",
+  -- "warn" = a case without assertions passes with a recorded warning. Needed because
+  -- scope_register_edge_spec.lua:183 asserts only when the machine has a clipboard provider,
+  -- so on a runner without one (ubuntu CI) it makes no assertion at all.
+  assertions = "warn",
 }
