@@ -36,7 +36,9 @@ local INDENT_ARG = { { name = "indent", type = "INT", optional = true } }
 ---@internal
 --- Shared path-separator flag for `lines`/`keys`.
 ---@type Lib.UserCmd.Composer.FlagSpec[]
-local SEP_FLAG = { { name = "sep", type = "STRING" } }
+local SEP_FLAG = {
+  { name = "sep", type = "STRING", desc = "Separator between nested keys (default: config sep)" },
+}
 
 ---@internal
 --- Source/target flags, offered on every route of every verb: where the
@@ -51,10 +53,28 @@ local SEP_FLAG = { { name = "sep", type = "STRING" } }
 --- as the indent.
 ---@type Lib.UserCmd.Composer.FlagSpec[]
 local IO_FLAGS = {
-  { name = "reg", type = "STRING", optional_value = true },
-  { name = "inplace", bool = true },
-  { name = "split", bool = true },
-  { name = "out-reg", type = "STRING", optional_value = true },
+  {
+    name = "reg",
+    type = "STRING",
+    optional_value = true,
+    desc = "Read the input from a register (bare: register.default)",
+  },
+  {
+    name = "inplace",
+    bool = true,
+    desc = "Replace the input with the result (with --reg: needs a range)",
+  },
+  {
+    name = "split",
+    bool = true,
+    desc = "Open the result in a scratch split (default for --reg)",
+  },
+  {
+    name = "out-reg",
+    type = "STRING",
+    optional_value = true,
+    desc = "Put the result into a register (bare: register.default)",
+  },
 }
 
 ---@internal
@@ -66,8 +86,17 @@ local IO_FLAGS = {
 --- that quietly does nothing.
 ---@type Lib.UserCmd.Composer.FlagSpec[]
 local PREVIEW_FLAGS = {
-  { name = "preview", bool = true },
-  { name = "no-preview", bool = true },
+  {
+    name = "preview",
+    bool = true,
+    desc = "Diff preview and confirmation before replacing (needs diff.nvim)",
+  },
+  -- Its own text: it also beats `preview.filter = true`, which "Off: ..." would not say.
+  {
+    name = "no-preview",
+    bool = true,
+    desc = "Replace without a preview, even if preview.filter is on",
+  },
 }
 
 ---@internal
