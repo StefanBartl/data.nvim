@@ -181,10 +181,13 @@ describe("data.scope.register.name -- the clipboard fallback", function()
   end)
 
   it("adds no note when a provider IS present", function()
-    local _, _, note = register.name(true)
-    if vim.fn.has("clipboard") == 1 then
-      assert.is_nil(note)
-    end
+    -- Faked, not probed: on a runner without a provider the assertion used to
+    -- be skipped, so this case asserted nothing there.
+    local got = with_clipboard(function()
+      local _, _, note = register.name(true)
+      return { note }
+    end)
+    assert.is_nil(got[1], "a present provider needs no substitution, hence no note")
   end)
 end)
 

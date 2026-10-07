@@ -38,7 +38,7 @@ function M.check()
   end
 
   local tables_ok, tables_mod = pcall(require, "lib.lua.tables")
-  if tables_ok and type(tables_mod.path_flatten) == "function" then
+  if tables_ok and vim.is_callable(tables_mod.path_flatten) then
     ok("lib.lua.tables.path_flatten available (:JSON/:YAML/:XML lines/keys)")
   else
     err(
@@ -48,7 +48,7 @@ function M.check()
   end
 
   local yaml_ok, yaml_mod = pcall(require, "lib.lua.yaml")
-  if yaml_ok and type(yaml_mod.encode) == "function" then
+  if yaml_ok and vim.is_callable(yaml_mod.encode) then
     ok("lib.lua.yaml.encode available (:YAML pretty/lines/keys/sort)")
   else
     err(
@@ -58,7 +58,7 @@ function M.check()
   end
 
   local window_ok, window_mod = pcall(require, "lib.nvim.window")
-  if window_ok and type(window_mod.open_scratch_split) == "function" then
+  if window_ok and vim.is_callable(window_mod.open_scratch_split) then
     ok("lib.nvim.window.open_scratch_split available (--split / register-scope results)")
   else
     err(
@@ -68,7 +68,7 @@ function M.check()
   end
 
   local xml_ok, xml_mod = pcall(require, "lib.lua.xml")
-  if xml_ok and type(xml_mod.decode) == "function" and type(xml_mod.encode) == "function" then
+  if xml_ok and vim.is_callable(xml_mod.decode) and vim.is_callable(xml_mod.encode) then
     ok("lib.lua.xml available (:XML pretty/compact/lines/keys/sort)")
   else
     err(

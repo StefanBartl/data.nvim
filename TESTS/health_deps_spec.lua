@@ -9,8 +9,8 @@
 -- health_spec.lua covers the section header, lib.nvim, path_flatten,
 -- color_my_ascii and pickers.nvim. Left over were the yaml/window/xml arms,
 -- diff.nvim, the Neovim-version warning, and -- the reason this file exists
--- -- whether the report is actually TRUE on a machine where everything works.
--- It is not: see the last describe block.
+-- -- whether the report is actually TRUE on a machine where everything works
+-- (see the last describe block).
 
 --- Capture every `vim.health.*` call made during `fn()`, restoring the real
 --- functions afterwards regardless of whether `fn()` errors. Same shape as
@@ -268,77 +268,65 @@ describe("data.health.check -- structural properties of the check itself", funct
   end)
 end)
 
-describe("BUG: :checkhealth data reports two errors on a fully working install", function()
-  -- Found by simply running the check with every dependency present and
-  -- reading what it said. `lib.lua.yaml.encode` and `lib.lua.xml.encode` are
-  -- both CALLABLE TABLES (a `__call` metamethod plus members like
-  -- `encode.pretty`, which `data.format.xml` calls by name), not bare
-  -- functions. `data.health` gates both on `type(...) == "function"`, which is
-  -- false for a table however callable it is -- so the check reports
-  --
-  --   error: lib.lua.yaml.encode not found -- lib.nvim is outdated
-  --   error: lib.lua.xml not found -- lib.nvim is outdated
-  --
-  -- at the highest severity, telling the user to update a dependency that is
-  -- fine, while `:YAML` and `:XML` work perfectly -- as the rest of this
-  -- suite demonstrates in the same process. Same root cause as the
-  -- buffer-ctx.nvim finding from earlier in this campaign: a lib.nvim
-  -- `require` hands back a `__call`-able table, not a function.
-  --
-  -- Not fixed here (that is a one-line change to a user-visible report, and a
-  -- separate decision): pinned, so the fix has something to flip.
+describe(":checkhealth data on a fully working install", function()
+  -- `lib.lua.yaml.encode` and `lib.lua.xml.encode` are CALLABLE TABLES (a
+  -- `__call` metamethod plus members like `encode.pretty`, which
+  -- `data.format.xml` calls by name), not bare functions. The check used to
+  -- gate them on `type(...) == "function"`, which is false for a table however
+  -- callable it is, and reported two false ERRORs on a healthy install. It
+  -- asks `vim.is_callable` now.
 
   before_each(function()
     package.loaded["data.health"] = nil
   end)
 
-  it("lib.lua.yaml.encode is callable, but is a table and not a function", function()
+  --- A callable table: what lib.nvim's encoders look like.
+  ---@return table
+  local function callable_table()
+    return setmetatable({}, {
+      __call = function()
+        return "x"
+      end,
+    })
+  end
+
+  it("lib.lua.yaml.encode and lib.lua.xml.encode are callable tables, not functions", function()
     local yaml = require("lib.lua.yaml")
-    assert.equals("table", type(yaml.encode), "BUG: this is what the check rejects")
-    assert.equals("function", type(getmetatable(yaml.encode).__call), "and it IS callable")
+    assert.equals("table", type(yaml.encode))
     assert.is_not_nil(yaml.encode({ a = 1 }), "and calling it works")
+    assert.equals("function", type(require("lib.lua.xml").encode.pretty))
   end)
 
-  it("lib.lua.xml.encode is the same shape, with a .pretty member besides", function()
-    local xml = require("lib.lua.xml")
-    assert.equals("table", type(xml.encode), "BUG: this is what the check rejects")
-    assert.equals("function", type(xml.encode.pretty), "data.format.xml calls this by name")
-  end)
-
-  it("BUG: so the check errors about yaml.encode although :YAML works", function()
-    local calls = capture_health(function()
-      require("data.health").check()
+  it("accepts a callable-table encode without an error", function()
+    local calls
+    with_module_missing("lib.lua.yaml", { encode = callable_table() }, function()
+      with_module_missing(
+        "lib.lua.xml",
+        { decode = callable_table(), encode = callable_table() },
+        function()
+          calls = capture_health(function()
+            require("data.health").check()
+          end)
+        end
+      )
     end)
-    assert.is_true(
-      reported(calls, "error", "lib.lua.yaml.encode not found"),
-      "BUG: a false error on a healthy install"
-    )
-    assert.same(
-      { "a: 1" },
-      require("data.format.yaml").render({ a = 1 }, "pretty"),
-      ":YAML works in this very process, which is what makes the report false"
-    )
+    assert.is_false(reported(calls, "error", "lib.lua.yaml.encode not found"))
+    assert.is_false(reported(calls, "error", "lib.lua.xml not found"))
+    assert.is_true(reported(calls, "ok", "lib.lua.yaml.encode available"))
+    assert.is_true(reported(calls, "ok", "lib.lua.xml available"))
   end)
 
-  it("BUG: and errors about lib.lua.xml although :XML works", function()
-    local calls = capture_health(function()
-      require("data.health").check()
+  it("still rejects an encode that is neither a function nor callable", function()
+    local calls
+    with_module_missing("lib.lua.yaml", { encode = {} }, function()
+      calls = capture_health(function()
+        require("data.health").check()
+      end)
     end)
-    assert.is_true(
-      reported(calls, "error", "lib.lua.xml not found"),
-      "BUG: a false error on a healthy install"
-    )
-    assert.same(
-      { "<a/>" },
-      require("data.format.xml").render({ tag = "a", attrs = {}, children = {} }, "compact"),
-      ":XML works in this very process too"
-    )
+    assert.is_true(reported(calls, "error", "lib.lua.yaml.encode not found"))
   end)
 
-  it("BUG: exactly two of the errors on a healthy install are false ones", function()
-    -- Pins the count as well as the identities: a fix should take this to
-    -- zero, and any NEW false error should fail here rather than hide behind
-    -- the two already known.
+  it("reports no error at all with the real lib.nvim, while :YAML and :XML work", function()
     local calls = capture_health(function()
       require("data.health").check()
     end)
@@ -348,6 +336,11 @@ describe("BUG: :checkhealth data reports two errors on a fully working install",
         errors[#errors + 1] = c.msg
       end
     end
-    assert.equals(2, #errors, "BUG: a healthy install should report none")
+    assert.same({}, errors, "a healthy install should report none")
+    assert.same({ "a: 1" }, require("data.format.yaml").render({ a = 1 }, "pretty"))
+    assert.same(
+      { "<a/>" },
+      require("data.format.xml").render({ tag = "a", attrs = {}, children = {} }, "compact")
+    )
   end)
 end)

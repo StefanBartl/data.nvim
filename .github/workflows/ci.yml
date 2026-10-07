@@ -75,12 +75,12 @@ jobs:
           repository: "StefanBartl/testing.nvim"
           path: .deps/testing.nvim
           ref: ci-verified
-      # color_my_ascii.nvim has no ci-verified branch (its CI runs on main).
+      # Checked out from the branch that only moves once the dependency's own CI is green.
       - uses: actions/checkout@v5
         with:
           repository: "StefanBartl/color_my_ascii.nvim"
           path: .deps/color_my_ascii.nvim
-          ref: main
+          ref: ci-verified
       # Checked out from the branch that only moves once the dependency's own CI is green.
       - uses: actions/checkout@v5
         with:
