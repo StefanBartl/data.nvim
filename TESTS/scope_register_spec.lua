@@ -61,6 +61,12 @@ describe("data.scope.register.name", function()
 end)
 
 describe("data.scope.register.read", function()
+  after_each(function()
+    -- The expression-register case sets both; neither may outlive it.
+    vim.g.data_nvim_expr_probe = nil
+    vim.fn.setreg("=", "")
+  end)
+
   it("splits a linewise register into lines without a trailing blank", function()
     vim.fn.setreg("a", { "one", "two" }, "l")
     local lines, err = register.read("a")
