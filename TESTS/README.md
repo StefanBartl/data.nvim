@@ -95,7 +95,7 @@ binds `config`/`format`/`scope.source`/`scope.sink` to upvalues at load time
 | `util/oneline.lua` | `oneline_spec` |
 | `util/safe_call.lua` | `safe_call_spec` |
 | `health.lua` | `health_spec`, `health_deps_spec` |
-| `bindings/*` | `bindings_spec`, `routes_spec`, `usrcmds_help_spec` (every flag has a one-line description for the option float) |
+| `bindings/*` | `bindings_spec`, `routes_spec`, `usrcmds_help_spec` (every flag and positional argument has a one-line description for the option float) |
 
 Worth calling out, because each took a file of its own to get at:
 

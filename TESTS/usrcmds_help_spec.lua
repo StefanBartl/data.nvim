@@ -2,13 +2,14 @@
 -- crash and name it. The nil guards LuaLS asks for below would hide the very failure this spec
 -- exists to catch.
 ---@diagnostic disable: need-check-nil
--- TESTS/usrcmds_help_spec.lua -- every flag of `:JSON`/`:YAML`/`:XML`/`:Data` has a line in the
--- option float.
+-- TESTS/usrcmds_help_spec.lua -- every flag and positional argument of `:JSON`/`:YAML`/`:XML`/
+-- `:Data` has a line in the option float.
 --
 -- lib.nvim's help float (the option cheatsheet on the command line) shows one line per
--- `--flag` / `key=`, taken from the `desc` of its spec. This pins that no flag of any of the four
--- verbs ships without one, and that the lines stay what the float expects: one short line, no
--- trailing full stop.
+-- `--flag` / `key=`, taken from the `desc` of its spec, and one for the next positional argument
+-- (`to <format>`; the `[indent]` of `pretty`/`sort`/`ndjson` is a built-in INT and explains itself).
+-- This pins that nothing of any of the four verbs ships without one, and that the lines stay what
+-- the float expects: one short line, no trailing full stop.
 
 local VERBS = { "JSON", "YAML", "XML", "Data" }
 
@@ -30,6 +31,33 @@ describe("the option float of the format verbs", function()
         missing[#missing + 1] = ("%s %s %s"):format(m.route, m.kind, m.name)
       end
       assert.equals("", table.concat(missing, ", "))
+    end)
+
+    it((":%s leaves no positional argument without a description"):format(verb), function()
+      local missing = {}
+      for _, m in ipairs(composer.help.undocumented(verb, { args = true })) do
+        missing[#missing + 1] = ("%s %s %s"):format(m.route, m.kind, m.name)
+      end
+      assert.equals("", table.concat(missing, ", "))
+    end)
+
+    it((":%s keeps every argument text to one short line"):format(verb), function()
+      local handle = composer.registry()[verb]
+      assert.is_truthy(handle)
+      for _, route in ipairs(handle:spec().routes or {}) do
+        for _, arg in ipairs(route.args or {}) do
+          local texts = { arg.desc }
+          for _, text in pairs(arg.enum_desc or {}) do
+            texts[#texts + 1] = text
+          end
+          for _, text in ipairs(texts) do
+            local what = ("%s of %s %s"):format(arg.name, verb, table.concat(route.path, " "))
+            assert.is_nil(text:find("\n", 1, true), what .. " is one line")
+            assert.is_true(#text <= 80, what .. " stays short")
+            assert.is_nil(text:find("%.$"), what .. " has no trailing full stop")
+          end
+        end
+      end
     end)
 
     it((":%s keeps every description to one short line"):format(verb), function()
