@@ -219,7 +219,14 @@ local function make_routes(fmt, include_compact, include_ndjson, to_format)
     routes[#routes + 1] = {
       path = { "to" },
       range = true,
-      args = { { name = "format", type = "STRING", enum = { to_format } } },
+      args = {
+        {
+          name = "format",
+          type = "STRING",
+          enum = { to_format },
+          desc = ("Format to convert to (%s only)"):format(to_format),
+        },
+      },
       flags = with_io(),
       desc = ("Convert to %s"):format(to_format),
       run = function(ctx)
