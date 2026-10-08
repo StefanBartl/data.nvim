@@ -96,6 +96,7 @@ binds `config`/`format`/`scope.source`/`scope.sink` to upvalues at load time
 | `util/safe_call.lua` | `safe_call_spec` |
 | `health.lua` | `health_spec`, `health_deps_spec` |
 | `bindings/*` | `bindings_spec`, `routes_spec`, `usrcmds_help_spec` (every flag and positional argument has a one-line description for the option float) |
+| `.testing.lua` (the runner's own settings) | `testing_config_spec` (a case without an assertion fails, the guards stay in mode `error`, one nvim per spec file) |
 
 Worth calling out, because each took a file of its own to get at:
 
@@ -268,6 +269,12 @@ like one until you know):
   reason — an earlier draft of `oneline_spec.lua` put a real newline inside a
   JSON string literal, which is invalid JSON the decoder happened to tolerate.
 - Fixtures live in buffers, registers and `package.loaded` — nothing here
-  touches the filesystem, and nothing touches the repository.
+  writes to the filesystem, and nothing modifies the repository. (The one read is
+  `testing_config_spec.lua` loading `.testing.lua`.)
+- No spec may rely on a case passing *without* asserting: `.testing.lua` runs
+  with `assertions = "error"`, so a case that makes no assertion on some
+  platform (say, one guarded by `if clipboard_provider then assert ... end`) is
+  a failing case. Fake the platform fact instead — see `with_clipboard` in
+  `scope_register_edge_spec.lua`.
 - Both gates are `stylua --check .` and `luacheck .`, and **both include
   `TESTS/`**. Run them before pushing; CI runs exactly those.
