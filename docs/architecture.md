@@ -119,8 +119,8 @@ in-place write and nowhere else.
 The concept listed `--inplace`/`--split`/`--reg=<name>` as the target flags,
 while using `--reg=<name>` one paragraph earlier for the register *source*. One
 flag name cannot mean both "read from here" and "write to there" on the same
-command line. The source kept `--reg` — that is the reading the roadmap's Phase
-1 entry spells out first and in most detail, and it is the more common of the
+command line. The source kept `--reg` — that is the original concept's first
+and most detailed use of the flag, and it is the more common of the
 two by a wide margin — and the register target became `--out-reg`.
 
 ### `--reg --inplace` needs a range
