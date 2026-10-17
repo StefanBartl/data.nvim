@@ -125,6 +125,7 @@ end
 ---@param flags Data.IOFlags
 ---@return string|nil fmt
 ---@return string|nil err
+---@return boolean|nil undetermined # true when the register was read but its text names no format
 local function register_format(flags)
   local register = require("data.scope.register")
   local name, nerr = register.name(flags.reg)
@@ -139,10 +140,7 @@ local function register_format(flags)
   if fmt then
     return fmt, nil
   end
-  return nil,
-    ("could not determine a format from register '%s' -- use :JSON/:YAML/:XML directly"):format(
-      name
-    )
+  return nil, ("could not determine a format from register '%s'"):format(name), true
 end
 
 --- Guess `bufnr`'s data.nvim format for a `:Data` invocation.
@@ -151,6 +149,7 @@ end
 ---@param flags? Data.IOFlags
 ---@return string|nil fmt
 ---@return string|nil err
+---@return boolean|nil undetermined # true when the input was readable but names no format, so the caller may ask for one; nil for a hard error such as an invalid `--reg`
 function M.format(bufnr, cmd, flags)
   if flags and flags.reg ~= nil and flags.reg ~= false then
     return register_format(flags)
@@ -174,9 +173,10 @@ function M.format(bufnr, cmd, flags)
   end
 
   return nil,
-    ("could not determine a format (not inside a json/yaml/xml fenced block, and filetype %q doesn't map to one) -- use :JSON/:YAML/:XML directly"):format(
+    ("could not determine a format (not inside a json/yaml/xml fenced block, and filetype %q doesn't map to one)"):format(
       ft ~= "" and ft or "<empty>"
-    )
+    ),
+    true
 end
 
 return M

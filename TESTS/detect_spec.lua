@@ -44,10 +44,14 @@ describe("data.detect.format", function()
 
   it("reports a clear error when nothing maps to a format", function()
     vim.bo[bufnr].filetype = "markdown"
-    local fmt, err = require("data.detect").format(bufnr, { range = 0 })
+    local fmt, err, undetermined = require("data.detect").format(bufnr, { range = 0 })
     assert.is_nil(fmt)
     assert.matches("could not determine a format", err)
     assert.matches("markdown", err)
+    -- Readable input that names no format: :Data asks for one (UI-05), so the
+    -- message no longer tells the user to retype the command.
+    assert.is_true(undetermined)
+    assert.is_nil(err:find("use :JSON", 1, true))
   end)
 
   it("an explicit range still uses the filetype (never guesses a fence)", function()
@@ -204,10 +208,22 @@ describe(":Data", function()
     assert.same({ "user.id: 1" }, lines)
   end)
 
-  it("an unrecognized filetype leaves the buffer untouched and errors clearly", function()
+  it("an unrecognized filetype asks for the format; a dismissal changes nothing", function()
     vim.bo[bufnr].filetype = "markdown"
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "just some text" })
-    vim.cmd("Data")
+    local kit = require("lib.nvim.ui.kit")
+    local orig = kit.select
+    local asked = 0
+    kit.select = function(o)
+      asked = asked + 1
+      if o.on_cancel then
+        o.on_cancel()
+      end
+    end
+    local ok, err = pcall(vim.cmd, "Data")
+    kit.select = orig
+    assert.is_true(ok, err)
+    assert.equals(1, asked)
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
     assert.same({ "just some text" }, lines)
   end)

@@ -36,8 +36,8 @@
   auto-detected instead of named by the command: the enclosing fenced
   block's language tag when the cursor is inside one, the register's own
   first non-blank line under `--reg`, otherwise the buffer's own
-  `'filetype'`. A clear error, not a guess, when none of them maps to
-  json/yaml/xml — use `:JSON`/`:YAML`/`:XML` directly in that case.
+  `'filetype'`. No guess when none of them maps to json/yaml/xml: it asks
+  which of the three it is and goes on with the same input.
 - Read the input from a register instead of the buffer (`:JSON pretty --reg=+`)
   and open the result in a scratch split, so a payload copied out of a ticket
   tool can be formatted without touching whatever buffer you happen to be in.
