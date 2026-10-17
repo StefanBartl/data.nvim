@@ -168,8 +168,10 @@ from, in order:
 3. The buffer's own `'filetype'` otherwise (a compound filetype like
    `yaml.docker-compose` is read by its first dotted component).
 
-None of them found: a clear error naming the buffer's filetype (or the
-register), not a guess — use `:JSON`/`:YAML`/`:XML` directly instead.
+None of them found: no guess — `:Data` asks which format it is (JSON, YAML
+or XML; lib.nvim's chooser, or your `vim.ui.select`), naming the buffer's
+filetype (or the register), and goes on with the same range, scope or
+register. Dismissing the question does nothing.
 
 **Scope:** an explicit range (`:5,12JSON compact`) or visual selection
 (`'<,'>YAML lines`) always wins. Without one: if the cursor sits inside a

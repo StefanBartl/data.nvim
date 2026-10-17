@@ -616,12 +616,51 @@ function M.filter(fmt, cmd, opts, flags)
   end)
 end
 
+---@internal
+--- The formats `:Data` can fall back to when detection finds none, in the
+--- order the picker lists them.
+local ASK_FORMATS = { "json", "yaml", "xml" }
+
+---@internal
+--- Ask which format the input is. `on_choice(fmt)` fires only for a real
+--- pick; a dismissed picker calls nothing. lib.nvim's kit chooser when it
+--- loads (it defers to a user's `vim.ui.select` override itself), plain
+--- `vim.ui.select` otherwise.
+---@param prompt string
+---@param on_choice fun(fmt: string)
+---@return nil
+local function ask_format(prompt, on_choice)
+  local function format_item(fmt)
+    return fmt:upper()
+  end
+  local ok, kit = pcall(require, "lib.nvim.ui.kit")
+  if ok and type(kit) == "table" and type(kit.select) == "function" then
+    kit.select({
+      items = ASK_FORMATS,
+      title = prompt,
+      format_item = format_item,
+      respect_override = true,
+      on_select = function(fmt)
+        on_choice(fmt)
+      end,
+    })
+    return
+  end
+  vim.ui.select(ASK_FORMATS, { prompt = prompt, format_item = format_item }, function(fmt)
+    if fmt ~= nil then
+      on_choice(fmt)
+    end
+  end)
+end
+
 --- Auto-detect the format for a `:Data <action>` invocation (an enclosing
 --- fenced code block's language when the cursor sits inside one and no
 --- explicit range was given, the register's own first non-blank line under
 --- `--reg`, otherwise the buffer's own filetype -- see `data.detect`) and
---- dispatch to `run`/`filter` accordingly. `:JSON`/`:YAML`/`:XML` never
---- need this: the verb itself already says the format.
+--- dispatch to `run`/`filter` accordingly. When none of those names a
+--- format, it asks for JSON/YAML/XML and goes on with the same input; a
+--- dismissed question does nothing. `:JSON`/`:YAML`/`:XML` never need this:
+--- the verb itself already says the format.
 ---@param action string # "pretty"|"lines"|"keys"|"sort"|"filter" -- the format-agnostic subset every formatter supports the same way
 ---@param cmd Lib.UserCommand.Args
 ---@param opts? Data.RenderOpts
@@ -633,17 +672,38 @@ function M.run_auto(action, cmd, opts, flags)
   -- for the source itself further down. Reading a register has no side
   -- effects and no cost worth threading a pre-resolved source through two
   -- public functions to avoid.
-  local fmt, derr = require("data.detect").format(bufnr, cmd, flags)
-  if not fmt then
+  local fmt, derr, undetermined = require("data.detect").format(bufnr, cmd, flags)
+
+  local function dispatch(chosen)
+    if action == "filter" then
+      M.filter(chosen, cmd, opts, flags)
+    else
+      M.run(chosen, action, cmd, opts, flags)
+    end
+  end
+
+  if fmt then
+    dispatch(fmt)
+    return
+  end
+  if not undetermined then
     notify.error(derr)
     return
   end
 
-  if action == "filter" then
-    M.filter(fmt, cmd, opts, flags)
-  else
-    M.run(fmt, action, cmd, opts, flags)
-  end
+  -- The input was read but names no format (UI-05): ask for it instead of
+  -- telling the user to retype the command as :JSON/:YAML/:XML. The same
+  -- `cmd` and `flags` go on, so the same range, scope or register is used.
+  -- A dismissed picker does nothing further.
+  ask_format(("[data] %s -- which format is it?"):format(derr), function(chosen)
+    -- `M.run`/`M.filter` act on the current buffer; the picker is async, so
+    -- make sure that is still the buffer the question was about.
+    if vim.api.nvim_get_current_buf() ~= bufnr then
+      notify.error("the current buffer changed while the format was asked -- nothing done")
+      return
+    end
+    dispatch(chosen)
+  end)
 end
 
 --- Configure data.nvim and wire up its user commands.

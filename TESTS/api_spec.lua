@@ -47,6 +47,32 @@ local function said(msgs, needle)
   return false
 end
 
+--- Run `fn()` with lib.nvim's `kit.select` replaced by a double that answers
+--- with the item at `idx` (nil: the picker is dismissed). Returns every
+--- options table the double was opened with.
+---@param idx integer|nil
+---@param fn fun()
+---@return table[]
+local function with_select_answer(idx, fn)
+  local kit = require("lib.nvim.ui.kit")
+  local orig = kit.select
+  local seen = {}
+  kit.select = function(o)
+    seen[#seen + 1] = o
+    if idx then
+      o.on_select(o.items[idx], idx)
+    elseif o.on_cancel then
+      o.on_cancel()
+    end
+  end
+  local ok, err = pcall(fn)
+  kit.select = orig
+  if not ok then
+    error(err, 0)
+  end
+  return seen
+end
+
 --- A `Lib.UserCommand.Args` table with no range, which is what a direct caller
 --- has to pass. The composer builds one of these; nothing else does.
 ---@return Lib.UserCommand.Args
@@ -313,23 +339,92 @@ describe("data.run_auto -- the direct-call contract", function()
     )
   end)
 
-  it("reports an undetectable format and touches nothing", function()
+  it("asks for the format when none is detected and goes on with the pick (UI-05)", function()
+    vim.bo[bufnr].filetype = "markdown"
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { '{"b":2,"a":1}' })
+    local asked
+    local msgs = capture_notify(function()
+      asked = with_select_answer(1, function()
+        require("data").run_auto("pretty", no_range())
+      end)
+    end)
+    assert.equals(1, #asked)
+    assert.same({ "json", "yaml", "xml" }, asked[1].items)
+    assert.matches("could not determine a format", asked[1].title)
+    assert.is_nil(asked[1].title:find("use :JSON", 1, true))
+    assert.is_false(said(msgs, "could not determine a format"))
+    assert.same(
+      { "{", '  "a": 1,', '  "b": 2', "}" },
+      vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    )
+  end)
+
+  it("does nothing further when the format question is dismissed", function()
     vim.bo[bufnr].filetype = "markdown"
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "prose" })
+    local asked
     local msgs = capture_notify(function()
-      require("data").run_auto("pretty", no_range())
+      asked = with_select_answer(nil, function()
+        require("data").run_auto("pretty", no_range())
+      end)
     end)
-    assert.is_true(said(msgs, "could not determine a format"))
+    assert.equals(1, #asked)
+    assert.same({}, msgs)
     assert.same({ "prose" }, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
   end)
 
-  it("names an empty filetype as <empty> rather than printing nothing", function()
+  it("falls back to vim.ui.select when lib.nvim's kit does not load", function()
+    vim.bo[bufnr].filetype = "markdown"
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "b: 2", "a: 1" })
+    local had_kit = package.loaded["lib.nvim.ui.kit"]
+    local orig_preload = package.preload["lib.nvim.ui.kit"]
+    package.loaded["lib.nvim.ui.kit"] = nil
+    package.preload["lib.nvim.ui.kit"] = function()
+      error("kit unavailable")
+    end
+    local orig_select = vim.ui.select
+    local prompts = {}
+    ---@diagnostic disable-next-line: duplicate-set-field
+    vim.ui.select = function(items, o, cb)
+      prompts[#prompts + 1] = o.prompt
+      cb(items[2], 2)
+    end
+    local ok, err = pcall(require("data").run_auto, "sort", no_range())
+    vim.ui.select = orig_select
+    package.preload["lib.nvim.ui.kit"] = orig_preload
+    package.loaded["lib.nvim.ui.kit"] = had_kit
+    assert.is_true(ok, err)
+    assert.equals(1, #prompts)
+    assert.matches("which format", prompts[1])
+    assert.same({ "a: 1", "b: 2" }, vim.api.nvim_buf_get_lines(bufnr, 0, -1, false))
+  end)
+
+  it("names an empty filetype as <empty> in the question rather than printing nothing", function()
     vim.bo[bufnr].filetype = ""
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "prose" })
-    local msgs = capture_notify(function()
+    local asked = with_select_answer(nil, function()
       require("data").run_auto("pretty", no_range())
     end)
-    assert.is_true(said(msgs, "<empty>"))
+    assert.matches("<empty>", asked[1].title)
+  end)
+
+  it("asks about an unclassifiable register and goes on with the same register", function()
+    vim.fn.setreg("r", "just some prose", "c")
+    local data = require("data")
+    local orig_run = data.run
+    local runs = {}
+    data.run = function(fmt, action, _, _, flags)
+      runs[#runs + 1] = { fmt = fmt, action = action, reg = flags and flags.reg }
+    end
+    local ok, err = pcall(function()
+      local asked = with_select_answer(2, function()
+        data.run_auto("keys", no_range(), {}, { reg = "r" })
+      end)
+      assert.matches("from register 'r'", asked[1].title)
+    end)
+    data.run = orig_run
+    assert.is_true(ok, err)
+    assert.same({ { fmt = "yaml", action = "keys", reg = "r" } }, runs)
   end)
 
   it("reports a --reg whose name is not a single character", function()

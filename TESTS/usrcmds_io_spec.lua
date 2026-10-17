@@ -266,15 +266,26 @@ describe(":Data --reg", function()
     assert.same({ "{", '  "a": 1', "}" }, vim.api.nvim_buf_get_lines(result, 0, -1, false))
   end)
 
-  it("reports a register it cannot classify instead of guessing", function()
+  it("asks for the format of a register it cannot classify instead of guessing", function()
     vim.fn.setreg("r", "just some prose", "c")
 
-    local calls = capture_notify(function()
+    local kit = require("lib.nvim.ui.kit")
+    local orig = kit.select
+    local titles = {}
+    kit.select = function(o)
+      titles[#titles + 1] = o.title
+    end
+    local ok, err = pcall(capture_notify, function()
       vim.cmd("Data pretty --reg=r")
     end)
+    kit.select = orig
+    ---@diagnostic disable-next-line: undefined-field
+    assert.is_true(ok, err)
 
     ---@diagnostic disable-next-line: undefined-field
-    assert.is_true(notified(calls, "could not determine a format from register"))
+    assert.equals(1, #titles)
+    ---@diagnostic disable-next-line: undefined-field
+    assert.matches("could not determine a format from register 'r'", titles[1])
   end)
 end)
 
