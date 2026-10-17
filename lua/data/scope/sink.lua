@@ -10,8 +10,8 @@
 --- `--split`/`--reg=<name>` as the three target flags while ALSO using
 --- `--reg=<name>` for the register *source* one paragraph earlier. One name
 --- cannot mean both "read from here" and "write to there" on the same
---- command line, so the source keeps `--reg` (that is the reading the
---- roadmap's Phase 1 bullet spells out first and in most detail) and the
+--- command line, so the source keeps `--reg` (the original concept's first
+--- and most detailed use of the flag) and the
 --- register *target* is `--out-reg`.
 ---
 --- Like `data.scope.source`, this notifies nothing itself and returns a
