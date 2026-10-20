@@ -62,7 +62,7 @@ describe("data.config", function()
 
     local found = false
     for _, m in ipairs(calls) do
-      if m:match("unknown config key 'jsno'") then
+      if m:match("unknown option 'jsno'") then
         found = true
       end
     end
@@ -88,7 +88,7 @@ describe("data.config", function()
 
     local found = false
     for _, m in ipairs(calls) do
-      if m:match("'json%.indent' should be number, got string") then
+      if m:match("'json%.indent' must be a number, got [\"]four[\"]") then
         found = true
       end
     end
