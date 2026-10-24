@@ -3,6 +3,6 @@
 # Dependencies the CI workflow checks out next to the plugin (lib.nvim, testing.nvim, ...).
 /.deps/
 
-# Generated module map (documentation.nvim), derived output: `:DocMap`
+# Generated module map (docmap.nvim), derived output: `:DocMap`
 # rebuilds it from the current tree in seconds. Deliberately not committed.
 docs/map/
