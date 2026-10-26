@@ -62,7 +62,7 @@ jobs:
       # specs really run; testing.nvim is the runner.
       - uses: actions/checkout@v5
         with:
-          repository: StefanBartl/lib.nvim
+          repository: WKDSteve/lib.nvim
           path: .deps/lib.nvim
           ref: ci-verified
       - uses: rhysd/action-setup-vim@v1
@@ -72,25 +72,25 @@ jobs:
       # Checked out from the branch that only moves once the dependency's own CI is green.
       - uses: actions/checkout@v5
         with:
-          repository: "StefanBartl/testing.nvim"
+          repository: "WKDSteve/testing.nvim"
           path: .deps/testing.nvim
           ref: ci-verified
       # Checked out from the branch that only moves once the dependency's own CI is green.
       - uses: actions/checkout@v5
         with:
-          repository: "StefanBartl/color_my_ascii.nvim"
+          repository: "WKDSteve/color_my_ascii.nvim"
           path: .deps/color_my_ascii.nvim
           ref: ci-verified
       # Checked out from the branch that only moves once the dependency's own CI is green.
       - uses: actions/checkout@v5
         with:
-          repository: "StefanBartl/diff.nvim"
+          repository: "WKDSteve/diff.nvim"
           path: .deps/diff.nvim
           ref: ci-verified
       # Checked out from the branch that only moves once the dependency's own CI is green.
       - uses: actions/checkout@v5
         with:
-          repository: "StefanBartl/pickers.nvim"
+          repository: "WKDSteve/pickers.nvim"
           path: .deps/pickers.nvim
           ref: ci-verified
       # windows-latest's default shell is pwsh, not bash -- scripts/test.sh

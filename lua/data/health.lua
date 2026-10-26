@@ -34,7 +34,7 @@ function M.check()
   if pcall(require, "lib.nvim.bindings.usercmd.composer") then
     ok("lib.nvim detected (:JSON command layer)")
   else
-    err("lib.nvim not found -- :JSON will fail to load", { 'Install "StefanBartl/lib.nvim"' })
+    err("lib.nvim not found -- :JSON will fail to load", { 'Install "WKDSteve/lib.nvim"' })
   end
 
   local tables_ok, tables_mod = pcall(require, "lib.lua.tables")
@@ -43,7 +43,7 @@ function M.check()
   else
     err(
       "lib.lua.tables.path_flatten not found -- lib.nvim is outdated",
-      { "Update StefanBartl/lib.nvim to a version that ships tables.path_flatten" }
+      { "Update WKDSteve/lib.nvim to a version that ships tables.path_flatten" }
     )
   end
 
@@ -53,7 +53,7 @@ function M.check()
   else
     err(
       "lib.lua.yaml.encode not found -- lib.nvim is outdated",
-      { "Update StefanBartl/lib.nvim to a version that ships yaml.encode" }
+      { "Update WKDSteve/lib.nvim to a version that ships yaml.encode" }
     )
   end
 
@@ -63,7 +63,7 @@ function M.check()
   else
     err(
       "lib.nvim.window.open_scratch_split not found -- lib.nvim is outdated",
-      { "Update StefanBartl/lib.nvim to a version that ships window.open_scratch_split" }
+      { "Update WKDSteve/lib.nvim to a version that ships window.open_scratch_split" }
     )
   end
 
@@ -73,7 +73,7 @@ function M.check()
   else
     err(
       "lib.lua.xml not found -- lib.nvim is outdated",
-      { "Update StefanBartl/lib.nvim to a version that ships lib.lua.xml" }
+      { "Update WKDSteve/lib.nvim to a version that ships lib.lua.xml" }
     )
   end
 

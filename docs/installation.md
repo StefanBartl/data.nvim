@@ -4,8 +4,8 @@
 
 ```lua
 {
-  "StefanBartl/data.nvim",
-  dependencies = { "StefanBartl/lib.nvim" },
+  "WKDSteve/data.nvim",
+  dependencies = { "WKDSteve/lib.nvim" },
   cmd = { "JSON", "YAML", "XML", "Data" },
   opts = {},
 },
@@ -22,8 +22,8 @@ you'd rather load it eagerly or on a filetype.
 
 ```lua
 use({
-  "StefanBartl/data.nvim",
-  requires = { "StefanBartl/lib.nvim" },
+  "WKDSteve/data.nvim",
+  requires = { "WKDSteve/lib.nvim" },
   config = function()
     require("data").setup()
   end,

@@ -2,7 +2,7 @@
 
 ## color_my_ascii.nvim — fenced-block scope
 
-**Optional.** When [`color_my_ascii.nvim`](https://github.com/StefanBartl/color_my_ascii.nvim)
+**Optional.** When [`color_my_ascii.nvim`](https://github.com/WKDSteve/color_my_ascii.nvim)
 is installed and the cursor sits inside a fenced code block tagged
 ` ```json `/` ```yaml `/` ```xml ` (e.g. in a Markdown note), a `:JSON`/`:YAML`/`:XML`
 invocation with **no explicit range** acts on that block's interior instead of
@@ -24,7 +24,7 @@ visual selection (`:5,8JSON pretty`, `'<,'>JSON pretty`) always wins over this,
 same as it wins over the whole-buffer default.
 
 Nothing to install beyond `color_my_ascii.nvim` itself — data.nvim calls its
-public [fence API](https://github.com/StefanBartl/color_my_ascii.nvim/blob/main/docs/api.md#fence-api-for-plugin-authors)
+public [fence API](https://github.com/WKDSteve/color_my_ascii.nvim/blob/main/docs/api.md#fence-api-for-plugin-authors)
 (`color_my_ascii.fences.block_at`) via `pcall`, so its absence is a silent,
 total no-op: `:checkhealth data` reports whether it was found, and whole-buffer
 scope is used either way. Disable the feature outright with
@@ -41,8 +41,8 @@ commands' scope.
 **Required for this one action, unlike every other integration on this page.**
 `filter` reduces the flattened `path`/`value` entries `lines`/`keys` already
 render down to the ones matching a clause stack, built interactively via
-[`pickers.nvim`](https://github.com/StefanBartl/pickers.nvim)'s
-[`pickers.refine`](https://github.com/StefanBartl/pickers.nvim/blob/main/docs/FEATURES/REFINE.md)
+[`pickers.nvim`](https://github.com/WKDSteve/pickers.nvim)'s
+[`pickers.refine`](https://github.com/WKDSteve/pickers.nvim/blob/main/docs/FEATURES/REFINE.md)
 module — a pure model+UI filter stack with no picker-engine dependency of its
 own (it never opens, closes or refreshes a picker; data.nvim doesn't either).
 
@@ -53,7 +53,7 @@ than silently doing nothing. `:checkhealth data` reports whether
 
 ## diff.nvim — `filter --preview`
 
-**Optional.** [`diff.nvim`](https://github.com/StefanBartl/diff.nvim) renders
+**Optional.** [`diff.nvim`](https://github.com/WKDSteve/diff.nvim) renders
 the before/after diff behind `filter --preview`: instead of replacing the
 scope outright, the result is shown as a unified diff against what is there
 now, and written only if you say so.

@@ -1,7 +1,7 @@
 ---@module 'data.preview'
 --- Before/after preview for a `filter` run that is about to replace its scope
 --- in place: renders the two sides as a unified diff through
---- [diff.nvim](https://github.com/StefanBartl/diff.nvim) and asks whether to
+--- [diff.nvim](https://github.com/WKDSteve/diff.nvim) and asks whether to
 --- apply it.
 ---
 --- Offered on `filter` only, and that is deliberate twice over. `filter` is

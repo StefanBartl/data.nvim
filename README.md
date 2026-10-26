@@ -14,16 +14,16 @@
                                                .nvim
 ```
 
-> Pairs well with [pickers.nvim](https://github.com/StefanBartl/pickers.nvim) —
+> Pairs well with [pickers.nvim](https://github.com/WKDSteve/pickers.nvim) —
 > `:JSON`/`:YAML`/`:XML filter` is built on its `pickers.refine`.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Neovim](https://img.shields.io/badge/Neovim-0.9%2B-57A143?logo=neovim&logoColor=white)](https://neovim.io)
 [![Lua](https://img.shields.io/badge/Lua-5.1%2FLuaJIT-2C2D72?logo=lua&logoColor=white)](https://www.lua.org)
 ![Status](https://img.shields.io/badge/status-beta-orange)
-[![wkd](https://img.shields.io/badge/wkd-family-c6ff3d)](https://stefanbartl.github.io/wkd/p/data/)
+[![wkd](https://img.shields.io/badge/wkd-family-c6ff3d)](https://wkdsteve.github.io/wkd/p/data/)
 
-> Part of the [wkd](https://stefanbartl.github.io/wkd/) family — see this plugin's [page](https://stefanbartl.github.io/wkd/p/data/) on the site.
+> Part of the [wkd](https://wkdsteve.github.io/wkd/) family — see this plugin's [page](https://wkdsteve.github.io/wkd/p/data/) on the site.
 
 Format and filter structured data (JSON, YAML, XML) in place, in the buffer or a
 visual selection — `pretty`, `compact` (JSON/XML), `lines` to flatten nested keys
@@ -67,7 +67,7 @@ answers.
 - [Why it does it that way](docs/architecture.md)
 - [Health check](docs/health.md) — what `:checkhealth data` reports, line by line.
 - [Contributing](docs/CONTRIBUTING.md)
-- [Feedback](https://github.com/StefanBartl/data.nvim/issues)
+- [Feedback](https://github.com/WKDSteve/data.nvim/issues)
 
 `:help data` is the same reference inside the editor.
 

@@ -16,7 +16,7 @@ so every action and flag below also has `<Tab>` completion.
 | `ndjson [indent]` | **`:JSON` only.** Pretty-print each line as its own JSON object, not the scope as one document. A line that fails to decode is left unchanged; the total skipped count is reported once. |
 | `to yaml` | **`:JSON` only.** Convert the scope to YAML, in place. |
 | `to json` | **`:YAML` only.** Convert the scope to JSON, in place. |
-| `filter [--sep=X] [--preview]` | Interactively reduce the flattened `path`/`value` entries down to the ones matching a clause stack, replacing the scope with the survivors' `lines`-style text. **Requires [pickers.nvim](https://github.com/StefanBartl/pickers.nvim);** `--preview` additionally requires [diff.nvim](https://github.com/StefanBartl/diff.nvim). |
+| `filter [--sep=X] [--preview]` | Interactively reduce the flattened `path`/`value` entries down to the ones matching a clause stack, replacing the scope with the survivors' `lines`-style text. **Requires [pickers.nvim](https://github.com/WKDSteve/pickers.nvim);** `--preview` additionally requires [diff.nvim](https://github.com/WKDSteve/diff.nvim). |
 
 Every action also takes the source/target flags below.
 
@@ -120,7 +120,7 @@ untouched, with a warning. `pickers.nvim` not installed is the one way any
 **`filter --preview`:** show the result as a unified diff against the scope as
 it stands, and write it only after an `Apply`/`Discard` prompt — so a filter
 that removes more than you meant can be thrown away before it lands. Backed by
-[diff.nvim](https://github.com/StefanBartl/diff.nvim); see
+[diff.nvim](https://github.com/WKDSteve/diff.nvim); see
 [integrations.md](integrations.md#diffnvim--filter---preview).
 
 ```vim
@@ -176,7 +176,7 @@ register. Dismissing the question does nothing.
 **Scope:** an explicit range (`:5,12JSON compact`) or visual selection
 (`'<,'>YAML lines`) always wins. Without one: if the cursor sits inside a
 matching ` ```json `/` ```yaml `/` ```xml ` fenced code block and
-[color_my_ascii.nvim](https://github.com/StefanBartl/color_my_ascii.nvim) is
+[color_my_ascii.nvim](https://github.com/WKDSteve/color_my_ascii.nvim) is
 installed, that block's interior is the scope (see
 [integrations.md](integrations.md)); otherwise the whole buffer. Either way,
 only the resolved lines are decoded and replaced — unless `--reg` names a

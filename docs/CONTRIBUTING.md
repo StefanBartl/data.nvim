@@ -7,7 +7,7 @@ scripts/test.sh                  # every spec
 scripts/test.sh --file config    # only spec files whose name contains "config"
 ```
 
-The suite runs on [testing.nvim](https://github.com/StefanBartl/testing.nvim).
+The suite runs on [testing.nvim](https://github.com/WKDSteve/testing.nvim).
 `scripts/test.sh` looks up testing.nvim and every dependency (`lib.nvim`,
 `color_my_ascii.nvim`, `diff.nvim`, `pickers.nvim`) in four places, in this
 order: `$<NAME>_DIR` (for example `LIB_NVIM_DIR`), `.deps/<name>`, a sibling

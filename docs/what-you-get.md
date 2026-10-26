@@ -22,13 +22,13 @@ Calling `require("data").setup()` with no arguments (or `opts = {}` under lazy.n
   `to yaml` (`:YAML` gets `to json`) — see [commands.md](commands.md).
 - With no range given, a cursor inside a matching fenced code block scopes to
   that block instead of the whole buffer, if
-  [color_my_ascii.nvim](https://github.com/StefanBartl/color_my_ascii.nvim) is
+  [color_my_ascii.nvim](https://github.com/WKDSteve/color_my_ascii.nvim) is
   installed — see [integrations.md](integrations.md). A total no-op without it.
 - `filter` (on any of the four commands) needs
-  [pickers.nvim](https://github.com/StefanBartl/pickers.nvim) installed —
+  [pickers.nvim](https://github.com/WKDSteve/pickers.nvim) installed —
   every other action works regardless. See [integrations.md](integrations.md).
 - `filter --preview` diffs the result against the scope and asks before
-  replacing it; it needs [diff.nvim](https://github.com/StefanBartl/diff.nvim).
+  replacing it; it needs [diff.nvim](https://github.com/WKDSteve/diff.nvim).
   Off by default (`preview.filter`), and only `filter` offers it.
 - Every action takes `--reg`/`--reg=<name>` to read from a register instead of
   the buffer, and `--inplace`/`--split`/`--out-reg=<name>` to say where the

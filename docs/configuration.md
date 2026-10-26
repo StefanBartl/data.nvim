@@ -58,7 +58,7 @@ directions — uses a plain `:new`, honoring your own `'splitbelow'`/
 `'splitright'`.
 
 `preview.filter = true` makes every in-place `filter` show a
-[diff.nvim](https://github.com/StefanBartl/diff.nvim) before/after diff and ask
+[diff.nvim](https://github.com/WKDSteve/diff.nvim) before/after diff and ask
 before writing; `--preview`/`--no-preview` override it per invocation. It
 requires diff.nvim — with the preview on and diff.nvim missing, `filter` reports
 that and writes nothing, rather than quietly filtering unseen. `preview.view`

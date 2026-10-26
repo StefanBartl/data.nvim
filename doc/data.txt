@@ -216,7 +216,7 @@ data.nvim is a thin editor layer: JSON decode/encode
 (`lib.lua.yaml`), XML decode/encode (`lib.lua.xml`), the shared null
 sentinel (`lib.lua.null`), and the recursive path-flattening `lines`/`keys`
 need (`lib.lua.tables.path_flatten`) all live in
-https://github.com/StefanBartl/lib.nvim, not in this plugin. The
+https://github.com/WKDSteve/lib.nvim, not in this plugin. The
 `:JSON`/`:YAML`/`:XML`/`:Data` commands themselves are built on
 `lib.nvim.bindings.usercmd.composer`.
 

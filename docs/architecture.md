@@ -70,7 +70,7 @@ tolerance is a property of the *command*, not smuggled into the formatter.
 
 `data.scope.resolve.lines` tries an explicit range first, exactly as before;
 only when there isn't one does it ask (via `pcall`) whether
-[color_my_ascii.nvim](https://github.com/StefanBartl/color_my_ascii.nvim)'s
+[color_my_ascii.nvim](https://github.com/WKDSteve/color_my_ascii.nvim)'s
 fence API knows about a block matching the requested format under the cursor.
 No color_my_ascii, no matching fence, or `fenced_scope.enable = false` all fall
 through to the pre-existing whole-buffer default unchanged -- the integration
@@ -81,7 +81,7 @@ adds a scope source, it doesn't touch the two that were already there. See
 
 `data.filter` doesn't add a fourth thing `path_flatten` needs to know how to
 do — it flattens exactly the way `lines` already does, then hands the result
-to [`pickers.nvim`](https://github.com/StefanBartl/pickers.nvim)'s
+to [`pickers.nvim`](https://github.com/WKDSteve/pickers.nvim)'s
 `pickers.refine`, a pure model+UI module with no picker-engine dependency of
 its own (the same building block `replacer.nvim` already uses outside of any
 picker). data.nvim owns none of the filter-stack UI; it only supplies the

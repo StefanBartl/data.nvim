@@ -2,7 +2,7 @@
 
 - Neovim **0.9+** (uses `vim.json.decode`/`vim.json.encode`'s `vim.NIL` sentinel and
   `vim.health`).
-- [`lib.nvim`](https://github.com/StefanBartl/lib.nvim) — **hard dependency**, not
+- [`lib.nvim`](https://github.com/WKDSteve/lib.nvim) — **hard dependency**, not
   optional. data.nvim's `:JSON`/`:YAML`/`:XML` commands are built on
   `lib.nvim.bindings.usercmd.composer`; `lines`/`keys` need `lib.lua.tables.path_flatten`,
   `:YAML` needs `lib.lua.yaml.encode`, and `:XML` needs `lib.lua.xml` (all ship with
@@ -11,13 +11,13 @@
   silently).
 
 No external CLI tools, no other plugins required.
-[`color_my_ascii.nvim`](https://github.com/StefanBartl/color_my_ascii.nvim) is an
+[`color_my_ascii.nvim`](https://github.com/WKDSteve/color_my_ascii.nvim) is an
 optional soft dependency for fenced-block scope
 ([integrations.md](integrations.md)) — its absence is a silent, total no-op.
-[`pickers.nvim`](https://github.com/StefanBartl/pickers.nvim) is an optional
+[`pickers.nvim`](https://github.com/WKDSteve/pickers.nvim) is an optional
 dependency required for exactly one action, `:JSON`/`:YAML`/`:XML filter`
 ([integrations.md](integrations.md)) — every other command works without it.
-[`diff.nvim`](https://github.com/StefanBartl/diff.nvim) is optional in the same
+[`diff.nvim`](https://github.com/WKDSteve/diff.nvim) is optional in the same
 way, for exactly one flag: `filter --preview`
 ([integrations.md](integrations.md)) — plain `filter` works without it. The
 default `preview.view = "inline"` works with any diff.nvim; the side-by-side

@@ -3,7 +3,7 @@
 --- on: an explicit range (visual selection or `:N,M`) wins; otherwise, when
 --- the cursor sits inside a matching fenced code block
 --- (` ```json `/` ```yaml `/` ```xml `) and
---- [`color_my_ascii`](https://github.com/StefanBartl/color_my_ascii.nvim) is
+--- [`color_my_ascii`](https://github.com/WKDSteve/color_my_ascii.nvim) is
 --- installed, that block's interior becomes the scope; otherwise the whole
 --- buffer. Purely additive soft integration: no color_my_ascii, no matching
 --- fence, or `fenced_scope.enable = false` all fall back to the previous
