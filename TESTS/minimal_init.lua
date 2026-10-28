@@ -131,8 +131,6 @@ add_optional_dep("DIFF_DIR", "diff.nvim", "diff")
 vim.o.swapfile = false
 vim.o.shadafile = "NONE"
 
-return { root = root, deps = found }
-
 -- No spec opens a dialog float: the shared dialog's `choose` asks through `vim.ui.select` here, which is also what it
 -- does natively, so the doubles the specs already set for `vim.ui.select` answer it. A choice comes back as its index
 -- (0 when dismissed), found by label when the double calls back with the label only.
@@ -152,3 +150,5 @@ if ok_dialog then
     end)
   end
 end
+
+return { root = root, deps = found }
