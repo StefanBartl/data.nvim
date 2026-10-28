@@ -186,9 +186,10 @@ function M.confirm(opts, on_decision)
     end
   end
 
-  vim.ui.select({ "Apply", "Discard" }, { prompt = opts.prompt }, function(choice)
+  -- The shared dialog: Discard is first and focused (a stray <CR> changes nothing); a dismissal is a discard too.
+  require("lib.nvim.ui.dialog").choose(opts.prompt, { "Discard", "Apply" }, 1, function(index)
     close_preview()
-    on_decision(choice == "Apply", nil)
+    on_decision(index == 2, nil)
   end)
 end
 

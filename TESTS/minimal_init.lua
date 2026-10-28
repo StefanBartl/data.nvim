@@ -132,3 +132,23 @@ vim.o.swapfile = false
 vim.o.shadafile = "NONE"
 
 return { root = root, deps = found }
+
+-- No spec opens a dialog float: the shared dialog's `choose` asks through `vim.ui.select` here, which is also what it
+-- does natively, so the doubles the specs already set for `vim.ui.select` answer it. A choice comes back as its index
+-- (0 when dismissed), found by label when the double calls back with the label only.
+local ok_dialog, dialog = pcall(require, "lib.nvim.ui.dialog")
+if ok_dialog then
+  dialog.choose = function(question, choices, _default, cb)
+    vim.ui.select(choices, { prompt = question }, function(label, index)
+      if not index and label ~= nil then
+        for i, c in ipairs(choices) do
+          if c == label then
+            index = i
+            break
+          end
+        end
+      end
+      cb(index or 0)
+    end)
+  end
+end
