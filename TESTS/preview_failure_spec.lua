@@ -137,39 +137,42 @@ describe("data.preview.confirm -- refusals, which are never a yes", function()
     assert.matches("did not render a preview", problem.msg)
   end)
 
-  it("asks through the shared dialog with Discard first and focused; a dismissal discards", function()
-    local dialog = require("lib.nvim.ui.dialog")
-    local orig_choose = dialog.choose
-    local asked
-    --- Test double: restored below.
-    ---@diagnostic disable-next-line: duplicate-set-field
-    dialog.choose = function(question, choices, default, cb)
-      asked = { question = question, choices = choices, default = default, cb = cb }
+  it(
+    "asks through the shared dialog with Discard first and focused; a dismissal discards",
+    function()
+      local dialog = require("lib.nvim.ui.dialog")
+      local orig_choose = dialog.choose
+      local asked
+      --- Test double: restored below.
+      ---@diagnostic disable-next-line: duplicate-set-field
+      dialog.choose = function(question, choices, default, cb)
+        asked = { question = question, choices = choices, default = default, cb = cb }
+      end
+      local had_diff = package.loaded["diff"]
+      package.loaded["diff"] = {
+        run = function()
+          vim.cmd("new")
+        end,
+      }
+      local decisions = {}
+      require("data.preview").confirm({
+        before = { "a" },
+        after = { "b" },
+        label = "json filter",
+        prompt = "replace?",
+      }, function(apply)
+        decisions[#decisions + 1] = apply
+      end)
+      local choices, default, question = asked.choices, asked.default, asked.question
+      asked.cb(0) -- dismissed
+      dialog.choose = orig_choose
+      package.loaded["diff"] = had_diff
+      assert.same({ "Discard", "Apply" }, choices)
+      assert.equals(1, default, "a stray <CR> changes nothing")
+      assert.equals("replace?", question)
+      assert.same({ false }, decisions, "a dismissal is a discard")
     end
-    local had_diff = package.loaded["diff"]
-    package.loaded["diff"] = {
-      run = function()
-        vim.cmd("new")
-      end,
-    }
-    local decisions = {}
-    require("data.preview").confirm({
-      before = { "a" },
-      after = { "b" },
-      label = "json filter",
-      prompt = "replace?",
-    }, function(apply)
-      decisions[#decisions + 1] = apply
-    end)
-    local choices, default, question = asked.choices, asked.default, asked.question
-    asked.cb(0) -- dismissed
-    dialog.choose = orig_choose
-    package.loaded["diff"] = had_diff
-    assert.same({ "Discard", "Apply" }, choices)
-    assert.equals(1, default, "a stray <CR> changes nothing")
-    assert.equals("replace?", question)
-    assert.same({ false }, decisions, "a dismissal is a discard")
-  end)
+  )
 
   it("never reaches the prompt when it cannot render", function()
     -- Asking "apply?" with nothing on screen to look at would be the worst
