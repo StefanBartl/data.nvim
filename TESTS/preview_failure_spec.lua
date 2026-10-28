@@ -174,6 +174,39 @@ describe("data.preview.confirm -- refusals, which are never a yes", function()
     end
   )
 
+  it("a dialog that raises closes the preview and reports instead of leaving it open", function()
+    local dialog = require("lib.nvim.ui.dialog")
+    local orig_choose = dialog.choose
+    --- Test double: restored below.
+    ---@diagnostic disable-next-line: duplicate-set-field
+    dialog.choose = function()
+      error("kit exploded")
+    end
+    local had_diff = package.loaded["diff"]
+    local preview_win
+    package.loaded["diff"] = {
+      run = function()
+        vim.cmd("new")
+        preview_win = vim.api.nvim_get_current_win()
+      end,
+    }
+    local got = {}
+    require("data.preview").confirm({
+      before = { "a" },
+      after = { "b" },
+      label = "json filter",
+      prompt = "replace?",
+    }, function(apply, problem)
+      got.apply, got.problem, got.called = apply, problem, true
+    end)
+    dialog.choose = orig_choose
+    package.loaded["diff"] = had_diff
+    assert.is_true(got.called, "the caller is told")
+    assert.is_nil(got.apply)
+    assert.matches("kit exploded", got.problem.msg)
+    assert.is_false(vim.api.nvim_win_is_valid(preview_win), "the preview window is closed")
+  end)
+
   it("never reaches the prompt when it cannot render", function()
     -- Asking "apply?" with nothing on screen to look at would be the worst
     -- outcome of all: a decision the user cannot make, taken anyway.

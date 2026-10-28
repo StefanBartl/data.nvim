@@ -118,7 +118,7 @@
 ---@field before string[] # the scope as it stands now
 ---@field after string[]  # what the action would replace it with
 ---@field label string    # short action name, e.g. "json filter" -- becomes both holder buffer names, and through them the rendered diff's own `---`/`+++` header
----@field prompt string   # the `vim.ui.select` prompt
+---@field prompt string   # the question of the dialog
 
 ---@class Data.SinkWriteOpts
 ---@field filetype? string # 'filetype' for a `--split` scratch buffer; nil when the output isn't in the source format (`lines`/`keys`/`filter`)

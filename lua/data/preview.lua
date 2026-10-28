@@ -187,10 +187,24 @@ function M.confirm(opts, on_decision)
   end
 
   -- The shared dialog: Discard is first and focused (a stray <CR> changes nothing); a dismissal is a discard too.
-  require("lib.nvim.ui.dialog").choose(opts.prompt, { "Discard", "Apply" }, 1, function(index)
+  local asked, err = pcall(
+    require("lib.nvim.ui.dialog").choose,
+    opts.prompt,
+    { "Discard", "Apply" },
+    1,
+    function(index)
+      close_preview()
+      on_decision(index == 2, nil)
+    end
+  )
+  if not asked then
+    -- a dialog that raises must not leave the preview windows behind with nobody to decide
     close_preview()
-    on_decision(index == 2, nil)
-  end)
+    on_decision(
+      nil,
+      { msg = "the question could not be asked: " .. tostring(err), level = "error" }
+    )
+  end
 end
 
 return M

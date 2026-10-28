@@ -585,7 +585,7 @@ function M.filter(fmt, cmd, opts, flags)
         end
 
         -- Same content-drift gap as the mid-prompt check above, one async
-        -- step later: the confirm dialog (vim.ui.select, wrapped by
+        -- step later: the confirm dialog (lib.nvim.ui.dialog, asked by
         -- data.preview) is itself async, and nothing locks the buffer while
         -- it is open. A character-level edit inside the span leaves the
         -- extmark's position untouched, so the position-only refresh just
