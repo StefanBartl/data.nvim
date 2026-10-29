@@ -23,6 +23,11 @@ those three specs also has a counterpart that runs against a double
 `filter_lifecycle_spec.lua`), so no code path is covered only on a machine that
 has all three installed.
 
+CI checks out all three (pinned to their `ci-verified` branch, which only moves
+once the dependency's own CI is green), so the real specs run on every
+platform there. Locally, without those checkouts, such a spec still silently
+registers zero tests; plenary-style "Success" does not mean it ran.
+
 [`TESTS/README.md`](../TESTS/README.md) is the register of what the suite
 covers, what it deliberately leaves out and why, and which known defects are
 pinned with a `BUG:`-marked assertion rather than fixed. Read it before adding
