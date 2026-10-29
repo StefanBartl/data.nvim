@@ -25,8 +25,9 @@ has all three installed.
 
 CI checks out all three (pinned to their `ci-verified` branch, which only moves
 once the dependency's own CI is green), so the real specs run on every
-platform there. Locally, without those checkouts, such a spec still silently
-registers zero tests; plenary-style "Success" does not mean it ran.
+platform there. Locally, a missing checkout makes `scripts/test.sh` stop with
+exit code 1, like any other missing dependency. The `pcall(require, ...)` guards
+in those specs only matter when a spec file is run outside the runner.
 
 [`TESTS/README.md`](../TESTS/README.md) is the register of what the suite
 covers, what it deliberately leaves out and why, and which known defects are
