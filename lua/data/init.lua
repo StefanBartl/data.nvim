@@ -290,6 +290,61 @@ local function resolve_render_opts(fmt, opts)
   }
 end
 
+---@class Data.Prepared
+---@field formatter table
+---@field opts Data.RenderOpts
+---@field bufnr integer
+---@field source Data.Source
+---@field sink Data.Sink
+---@field value any  # the decoded document (nil when decoding was skipped)
+
+---@internal
+--- The prelude `run`, `convert` and `filter` share: look the formatter up,
+--- resolve the render options, resolve source/sink for the current buffer and
+--- decode the input. Reports and returns nil on any failure.
+---@param fmt string                # format of the INPUT
+---@param cmd Lib.UserCommand.Args
+---@param opts Data.RenderOpts|nil
+---@param flags Data.IOFlags|nil
+---@param o? { render_fmt?: string, decode?: boolean }  # `render_fmt`: format whose config supplies indent/sep (default `fmt`); `decode = false` skips decoding (ndjson)
+---@return Data.Prepared|nil
+local function prepare(fmt, cmd, opts, flags, o)
+  o = o or {}
+  local formatter = formats.get(fmt)
+  if not formatter then
+    notify.error(("unknown format '%s'"):format(tostring(fmt)))
+    return nil
+  end
+
+  opts = resolve_render_opts(o.render_fmt or fmt, opts)
+
+  local bufnr = vim.api.nvim_get_current_buf()
+  local source, sink = resolve_io(bufnr, cmd, fmt, flags)
+  if not source then
+    return nil
+  end
+  ---@cast sink Data.Sink
+
+  local value
+  if o.decode ~= false then
+    local derr
+    value, derr = safe_call(formatter.decode, table.concat(source.lines, "\n"))
+    if derr then
+      notify.error(("%s decode failed: %s"):format(fmt:upper(), derr))
+      return nil
+    end
+  end
+
+  return {
+    formatter = formatter,
+    opts = opts,
+    bufnr = bufnr,
+    source = source,
+    sink = sink,
+    value = value,
+  }
+end
+
 --- Format the resolved input -- the buffer scope (range, fenced block, or
 --- whole buffer) or a register (`--reg`) -- and deliver the result to the
 --- resolved target (in place, a scratch split, or a register).
@@ -300,38 +355,22 @@ end
 ---@param flags? Data.IOFlags      # --reg / --inplace / --split / --out-reg
 ---@return nil
 function M.run(fmt, mode, cmd, opts, flags)
-  local formatter = formats.get(fmt)
-  if not formatter then
-    notify.error(("unknown format '%s'"):format(tostring(fmt)))
+  local p = prepare(fmt, cmd, opts, flags, { decode = mode ~= "ndjson" })
+  if not p then
     return
   end
-
-  opts = resolve_render_opts(fmt, opts)
-
-  local bufnr = vim.api.nvim_get_current_buf()
-  local source, sink = resolve_io(bufnr, cmd, fmt, flags)
-  if not source then
-    return
-  end
-  ---@cast sink Data.Sink
 
   if mode == "ndjson" then
-    deliver(sink, source, run_ndjson(formatter, fmt, source.lines, opts), fmt, mode)
+    deliver(p.sink, p.source, run_ndjson(p.formatter, fmt, p.source.lines, p.opts), fmt, mode)
     return
   end
 
-  local value, derr = safe_call(formatter.decode, table.concat(source.lines, "\n"))
-  if derr then
-    notify.error(("%s decode failed: %s"):format(fmt:upper(), derr))
-    return
-  end
-
-  local out, rerr = safe_call(formatter.render, value, mode, opts)
+  local out, rerr = safe_call(p.formatter.render, p.value, mode, p.opts)
   if not out then
     notify.error(("%s render failed: %s"):format(fmt:upper(), rerr))
     return
   end
-  deliver(sink, source, out, fmt, mode)
+  deliver(p.sink, p.source, out, fmt, mode)
 end
 
 --- Convert the resolved scope from `src_fmt` to `dst_fmt`, replacing it with
@@ -353,30 +392,20 @@ function M.convert(src_fmt, dst_fmt, cmd, opts, flags)
     return
   end
 
-  opts = resolve_render_opts(dst_fmt, opts)
-
-  local bufnr = vim.api.nvim_get_current_buf()
-  local source, sink = resolve_io(bufnr, cmd, src_fmt, flags)
-  if not source then
-    return
-  end
-  ---@cast sink Data.Sink
-
-  local value, derr = safe_call(src_formatter.decode, table.concat(source.lines, "\n"))
-  if derr then
-    notify.error(("%s decode failed: %s"):format(src_fmt:upper(), derr))
+  local p = prepare(src_fmt, cmd, opts, flags, { render_fmt = dst_fmt })
+  if not p then
     return
   end
 
-  local out, rerr = safe_call(dst_formatter.render, value, "pretty", opts)
+  local out, rerr = safe_call(dst_formatter.render, p.value, "pretty", p.opts)
   if not out then
     notify.error(("%s -> %s conversion failed: %s"):format(src_fmt:upper(), dst_fmt:upper(), rerr))
     return
   end
 
-  -- The result is a `dst_fmt` document, so that is what a `--split` result
-  -- buffer's 'filetype' has to say -- not the format it was read from.
-  deliver(sink, source, out, dst_fmt, "pretty")
+  -- The result is a `dst_fmt` document, so that is what a `--split`
+  -- result buffer's 'filetype' has to say -- not the format it was read from.
+  deliver(p.sink, p.source, out, dst_fmt, "pretty")
 end
 
 ---@internal
@@ -399,6 +428,181 @@ local function refresh_source_from_mark(bufnr, mark_id, source)
   source.s0 = mark[1]
   source.e0 = (mark[3] and mark[3].end_row) and (mark[3].end_row - 1) or source.e0
   return true
+end
+
+---@class Data.FilterCtx
+---@field fmt string
+---@field bufnr integer
+---@field source Data.Source
+---@field sink Data.Sink
+---@field prefix string
+---@field preview boolean
+---@field mark_id integer|nil   # extmark tracking the scope (in-place targets only)
+---@field del_mark fun()
+
+---@internal
+--- Stage "track": for an in-place target, follow the scope with an extmark
+--- across the prompt; other targets write somewhere that did not exist yet.
+---@param bufnr integer
+---@param source Data.Source
+---@param sink Data.Sink
+---@return integer|nil mark_id
+---@return fun() del_mark
+local function track_scope(bufnr, source, sink)
+  if sink.kind ~= "inplace" then
+    return nil, function() end
+  end
+  local mark_id = vim.api.nvim_buf_set_extmark(bufnr, FILTER_NS, source.s0, 0, {
+    end_row = (source.e0 or 0) + 1,
+    end_col = 0,
+  })
+  return mark_id,
+    function()
+      if vim.api.nvim_buf_is_valid(bufnr) then
+        pcall(vim.api.nvim_buf_del_extmark, bufnr, FILTER_NS, mark_id)
+      end
+    end
+end
+
+---@internal
+--- Stage "re-read": the live scope text, after the prompt/preview gap. Reports
+--- and returns nil when the buffer or the tracking mark is gone (the mark is
+--- left for the caller's cleanup exactly as before: nothing is written).
+---@param ctx Data.FilterCtx
+---@param closed_when string  # "before the filter finished" / "during the preview"
+---@return string[]|nil live
+local function reread_scope(ctx, closed_when)
+  if not vim.api.nvim_buf_is_valid(ctx.bufnr) then
+    notify.error(
+      ctx.prefix .. ("buffer was closed %s -- discarding the result"):format(closed_when)
+    )
+    return nil
+  end
+  if not refresh_source_from_mark(ctx.bufnr, ctx.mark_id, ctx.source) then
+    notify.error(ctx.prefix .. "the scope's tracking mark is gone -- discarding the result")
+    return nil
+  end
+  return vim.api.nvim_buf_get_lines(ctx.bufnr, ctx.source.s0, (ctx.source.e0 or 0) + 1, false)
+end
+
+---@internal
+--- Whether the scope's TEXT changed although its place did not: a
+--- character-level edit inside it (nvim_buf_set_text, :s///) leaves
+--- start/end untouched. A line-wise rewrite of the exact span already
+--- inverts the extmark (`s0 > e0`) and fails loudly of its own accord in the
+--- sink, with a clearer diagnosis than this check could give, so an inverted
+--- span is not re-flagged here.
+---@param source Data.Source
+---@param live string[]
+---@param expected string[]
+---@return boolean
+local function scope_drifted(source, live, expected)
+  return source.s0 <= (source.e0 or -1) and not vim.deep_equal(live, expected)
+end
+
+---@internal
+--- Stage "preview answer": the diff dialog was answered. The prompt is
+--- another arbitrarily long gap, so the span is re-read from the extmark once
+--- more rather than trusting the one taken before the preview opened, and
+--- `out` -- computed from `before`, the snapshot the user actually reviewed --
+--- must not replace text that changed after it was taken.
+---@param ctx Data.FilterCtx
+---@param out string[]
+---@param before string[]
+---@param apply boolean|nil
+---@param problem string|nil
+local function on_preview_answer(ctx, out, before, apply, problem)
+  if problem then
+    report(problem, ctx.prefix)
+    ctx.del_mark()
+    return
+  end
+  if not apply then
+    notify.info(ctx.prefix .. "discarded -- scope left unchanged")
+    ctx.del_mark()
+    return
+  end
+
+  if ctx.mark_id then
+    local live = reread_scope(ctx, "during the preview")
+    if not live then
+      return
+    end
+    if scope_drifted(ctx.source, live, before) then
+      notify.error(
+        ctx.prefix .. "the scope changed while the preview dialog was open -- discarding the result"
+      )
+      ctx.del_mark()
+      return
+    end
+  end
+  ctx.del_mark()
+
+  deliver(ctx.sink, ctx.source, out, ctx.fmt, "filter", ctx.prefix)
+end
+
+---@internal
+--- Stage "deliver": the clause loop produced `out`. Re-read the live scope
+--- BEFORE anything else (the extmark has tracked it across the whole prompt,
+--- and both the write span and the preview's "before" side have to come from
+--- where the scope actually is now), then write directly or ask via the diff
+--- preview first.
+---@param ctx Data.FilterCtx
+---@param out string[]|nil
+---@param ferr string|nil
+local function on_filtered(ctx, out, ferr)
+  if ferr then
+    notify.error(ctx.prefix .. ferr)
+    ctx.del_mark()
+    return
+  end
+  if not out then
+    -- Cancelled before any clause was added -- nothing to do, silently.
+    ctx.del_mark()
+    return
+  end
+  if #out == 0 then
+    notify.warn(ctx.prefix .. "no entries matched -- nothing written")
+    ctx.del_mark()
+    return
+  end
+
+  local before = ctx.source.lines
+  if ctx.mark_id then
+    local live = reread_scope(ctx, "before the filter finished")
+    if not live then
+      return
+    end
+    before = live
+    -- `--preview` already shows the freshly re-read content for the user to
+    -- judge before anything is written, so there is nothing silent to guard
+    -- against there.
+    if not ctx.preview and scope_drifted(ctx.source, before, ctx.source.lines) then
+      notify.error(
+        ctx.prefix .. "the scope changed while the prompt was open -- discarding the result"
+      )
+      ctx.del_mark()
+      return
+    end
+  end
+
+  if not ctx.preview or vim.deep_equal(before, out) then
+    -- Identical sides have nothing to show and nothing to decide: diff.nvim
+    -- would report "No differences found" and open no window, leaving a
+    -- prompt with no preview behind it.
+    ctx.del_mark()
+    deliver(ctx.sink, ctx.source, out, ctx.fmt, "filter", ctx.prefix)
+    return
+  end
+
+  require("data.preview").confirm({
+    before = before,
+    after = out,
+    label = ("%s filter"):format(ctx.fmt),
+    prompt = ("%s filter: replace %d line(s) with %d?"):format(ctx.fmt:upper(), #before, #out),
+  }, function(apply, problem)
+    on_preview_answer(ctx, out, before, apply, problem)
+  end)
 end
 
 --- Interactively filter the resolved input down to the flattened path/value
@@ -428,30 +632,18 @@ end
 --- the user says so -- see `data.preview`. The extmark therefore stays alive
 --- until after that decision, and the live span is re-read from it on both
 --- sides of the preview.
+---
+--- Stages: `prepare` (resolve + decode) -> `track_scope` -> the clause loop
+--- (`data.filter`) -> `on_filtered` (re-read, drift check, preview) ->
+--- `on_preview_answer` (re-read, drift check) -> `deliver`.
 ---@param fmt string              # "json"|"yaml"|"xml"
 ---@param cmd Lib.UserCommand.Args
 ---@param opts? Data.RenderOpts
 ---@param flags? Data.IOFlags
 ---@return nil
 function M.filter(fmt, cmd, opts, flags)
-  local formatter = formats.get(fmt)
-  if not formatter then
-    notify.error(("unknown format '%s'"):format(tostring(fmt)))
-    return
-  end
-
-  opts = resolve_render_opts(fmt, opts)
-
-  local bufnr = vim.api.nvim_get_current_buf()
-  local source, sink = resolve_io(bufnr, cmd, fmt, flags)
-  if not source then
-    return
-  end
-  ---@cast sink Data.Sink
-
-  local value, derr = safe_call(formatter.decode, table.concat(source.lines, "\n"))
-  if derr then
-    notify.error(("%s decode failed: %s"):format(fmt:upper(), derr))
+  local p = prepare(fmt, cmd, opts, flags)
+  if not p then
     return
   end
 
@@ -462,157 +654,28 @@ function M.filter(fmt, cmd, opts, flags)
     report(pproblem, prefix)
     return
   end
-  if preview and sink.kind ~= "inplace" then
+  if preview and p.sink.kind ~= "inplace" then
     -- Nothing to preview against: `--split`/`--out-reg` leave the scope
     -- exactly where it is, so the "before" is still on screen afterwards.
     notify.warn(prefix .. "--preview only applies to an in-place result -- ignored")
     preview = false
   end
 
-  local mark_id, del_mark
-  if sink.kind == "inplace" then
-    mark_id = vim.api.nvim_buf_set_extmark(bufnr, FILTER_NS, source.s0, 0, {
-      end_row = (source.e0 or 0) + 1,
-      end_col = 0,
-    })
-    del_mark = function()
-      if vim.api.nvim_buf_is_valid(bufnr) then
-        pcall(vim.api.nvim_buf_del_extmark, bufnr, FILTER_NS, mark_id)
-      end
-    end
-  else
-    del_mark = function() end
-  end
+  local mark_id, del_mark = track_scope(p.bufnr, p.source, p.sink)
+  ---@type Data.FilterCtx
+  local ctx = {
+    fmt = fmt,
+    bufnr = p.bufnr,
+    source = p.source,
+    sink = p.sink,
+    prefix = prefix,
+    preview = preview,
+    mark_id = mark_id,
+    del_mark = del_mark,
+  }
 
-  require("data.filter").run(formatter, value, opts, function(out, ferr)
-    if ferr then
-      notify.error(prefix .. ferr)
-      del_mark()
-      return
-    end
-    if not out then
-      -- Cancelled before any clause was added -- nothing to do, silently.
-      del_mark()
-      return
-    end
-    if #out == 0 then
-      notify.warn(prefix .. "no entries matched -- nothing written")
-      del_mark()
-      return
-    end
-
-    -- Re-read the live scope BEFORE anything else: the extmark has been
-    -- tracking it across the whole clause-building prompt, and both the write
-    -- span and the preview's "before" side have to come from where the scope
-    -- actually is now, not from where it was when the command was typed.
-    local before = source.lines
-    if mark_id then
-      if not vim.api.nvim_buf_is_valid(bufnr) then
-        notify.error(
-          prefix .. "buffer was closed before the filter finished -- discarding the result"
-        )
-        return
-      end
-      if not refresh_source_from_mark(bufnr, mark_id, source) then
-        notify.error(prefix .. "the scope's tracking mark is gone -- discarding the result")
-        return
-      end
-      before = vim.api.nvim_buf_get_lines(bufnr, source.s0, (source.e0 or 0) + 1, false)
-
-      -- The extmark only proves the scope is still in the same PLACE, not
-      -- that it still holds the same TEXT: a character-level edit inside it
-      -- (nvim_buf_set_text, :s///) leaves start/end untouched, so the write
-      -- below would otherwise silently replace freshly-typed text with a
-      -- result computed from what was there before the prompt opened.
-      --
-      -- Two things this must NOT re-flag, so both are excluded explicitly:
-      -- a line-wise rewrite of the exact span already inverts the extmark
-      -- (`source.s0 > source.e0`) and fails loudly of its own accord a few
-      -- lines down, with a clearer diagnosis than this check could give; and
-      -- `--preview` already shows the freshly re-read content for the user
-      -- to judge before anything is written, so there is nothing silent to
-      -- guard against there.
-      if
-        not preview
-        and source.s0 <= (source.e0 or -1)
-        and not vim.deep_equal(before, source.lines)
-      then
-        notify.error(
-          prefix .. "the scope changed while the prompt was open -- discarding the result"
-        )
-        del_mark()
-        return
-      end
-    end
-
-    if not preview or vim.deep_equal(before, out) then
-      -- Identical sides have nothing to show and nothing to decide: diff.nvim
-      -- would report "No differences found" and open no window, leaving a
-      -- prompt with no preview behind it.
-      del_mark()
-      deliver(sink, source, out, fmt, "filter", prefix)
-      return
-    end
-
-    require("data.preview").confirm({
-      before = before,
-      after = out,
-      label = ("%s filter"):format(fmt),
-      prompt = ("%s filter: replace %d line(s) with %d?"):format(fmt:upper(), #before, #out),
-    }, function(apply, problem)
-      if problem then
-        report(problem, prefix)
-        del_mark()
-        return
-      end
-      if not apply then
-        notify.info(prefix .. "discarded -- scope left unchanged")
-        del_mark()
-        return
-      end
-
-      -- The prompt is another arbitrarily long gap, so the span is re-read
-      -- from the extmark once more rather than trusting the one taken before
-      -- the preview opened.
-      if mark_id then
-        if not vim.api.nvim_buf_is_valid(bufnr) then
-          notify.error(prefix .. "buffer was closed during the preview -- discarding the result")
-          return
-        end
-        if not refresh_source_from_mark(bufnr, mark_id, source) then
-          notify.error(prefix .. "the scope's tracking mark is gone -- discarding the result")
-          return
-        end
-
-        -- Same content-drift gap as the mid-prompt check above, one async
-        -- step later: the confirm dialog (lib.nvim.ui.dialog, asked by
-        -- data.preview) is itself async, and nothing locks the buffer while
-        -- it is open. A character-level edit inside the span leaves the
-        -- extmark's position untouched, so the position-only refresh just
-        -- above is not enough on its own -- `out` was computed from `before`,
-        -- the snapshot the user actually reviewed in the diff, and an Apply
-        -- click must not silently replace text that changed after that
-        -- snapshot was taken. Same inverted-span exclusion as the first
-        -- check: a line-wise rewrite of the exact span fails loudly a few
-        -- lines down instead.
-        if
-          source.s0 <= (source.e0 or -1)
-          and not vim.deep_equal(
-            vim.api.nvim_buf_get_lines(bufnr, source.s0, (source.e0 or 0) + 1, false),
-            before
-          )
-        then
-          notify.error(
-            prefix .. "the scope changed while the preview dialog was open -- discarding the result"
-          )
-          del_mark()
-          return
-        end
-      end
-      del_mark()
-
-      deliver(sink, source, out, fmt, "filter", prefix)
-    end)
+  require("data.filter").run(p.formatter, p.value, p.opts, function(out, ferr)
+    on_filtered(ctx, out, ferr)
   end)
 end
 
